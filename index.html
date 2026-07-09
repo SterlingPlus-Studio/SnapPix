@@ -1,0 +1,2783 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>SnapPix</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <style>
+    /* ===== ESTILOS GLOBALES ===== */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      outline: none;
+      font-family: 'CustomFont', system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    }
+    *:focus {
+      outline: none !important;
+      box-shadow: none !important;
+    }
+    button:focus, input:focus, textarea:focus, select:focus {
+      outline: none !important;
+      box-shadow: none !important;
+    }
+    @font-face {
+      font-family: 'CustomFont';
+      src: url('https://raw.githubusercontent.com/SterlingPlus-Studio/clyraplay.xyz/main/Fuente/fuente.ttf') format('truetype');
+      font-weight: normal;
+      font-style: normal;
+      font-display: swap;
+    }
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      background: #000;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    body {
+      background: #000;
+      display: flex;
+      flex-direction: column;
+      padding-top: 70px;
+      padding-bottom: 80px;
+      transition: padding-top 0.2s;
+    }
+    body.top-bar-hidden {
+      padding-top: 0;
+    }
+
+    /* ===== TOP BAR ===== */
+    .top-bar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: #000;
+      padding: 16px 20px 12px 20px;
+      border-bottom: 1px solid #222;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      z-index: 1000;
+      height: 70px;
+    }
+    .top-bar.hidden { display: none; }
+    .top-bar .app-title {
+      font-size: 24px;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: default;
+    }
+    .top-bar .app-title span {
+      background: linear-gradient(145deg, #60a5fa, #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .top-bar .search-icon {
+      color: #ccc;
+      font-size: 22px;
+      cursor: pointer;
+      background: none;
+      border: none;
+      padding: 6px;
+      transition: 0.2s;
+    }
+    .top-bar .search-icon:hover { color: #fff; }
+
+    /* ===== MAIN CONTENT ===== */
+    .main-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: #000;
+      overflow-y: auto;
+      scroll-snap-type: y mandatory;
+      scroll-behavior: smooth;
+      -webkit-overflow-scrolling: touch;
+      height: 100%;
+      position: relative;
+    }
+    .feed-container {
+      width: 100%;
+      max-width: 600px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      padding: 0;
+      background: #000;
+    }
+
+    /* ===== POST CARD ===== */
+    .post-card {
+      position: relative;
+      width: 100%;
+      height: calc(100dvh - 70px - 80px);
+      min-height: 500px;
+      background-color: #000;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      overflow: hidden;
+      border-radius: 0;
+      border: none;
+      scroll-snap-align: start;
+      scroll-snap-stop: always;
+      flex-shrink: 0;
+      scroll-margin: 0;
+    }
+    body.top-bar-hidden .post-card {
+      height: calc(100dvh - 80px);
+    }
+    .post-image-carousel {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      display: flex;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+      scroll-behavior: smooth;
+      background: #000;
+      z-index: 1;
+    }
+    .post-image-carousel::-webkit-scrollbar { display: none; }
+    .carousel-slide {
+      flex: 0 0 100%;
+      height: 100%;
+      background-size: contain;
+      background-position: center;
+      background-repeat: no-repeat;
+      scroll-snap-align: start;
+      scroll-snap-stop: always;
+      background-color: #000;
+    }
+    .post-card::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 50%;
+      background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 100%);
+      pointer-events: none;
+      z-index: 2;
+    }
+    .post-bottom-left {
+      position: absolute;
+      bottom: 16px;
+      left: 16px;
+      right: 80px;
+      z-index: 3;
+      color: #fff;
+      pointer-events: none;
+      max-width: 70%;
+    }
+    .post-description {
+      font-size: 16px;
+      line-height: 1.5;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.9);
+      pointer-events: auto;
+      word-wrap: break-word;
+      max-height: 40vh;
+      overflow-y: auto;
+      color: #fff;
+    }
+    .post-description .hashtag { color: #60a5fa; font-weight: 500; }
+    .post-music-tag {
+      position: absolute;
+      bottom: 60px;
+      left: 16px;
+      z-index: 3;
+      color: rgba(255,255,255,0.9);
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(4px);
+      padding: 4px 14px;
+      border-radius: 30px;
+      pointer-events: auto;
+      cursor: pointer;
+      max-width: 70%;
+      transition: 0.2s;
+    }
+    .post-music-tag:hover { background: rgba(0,0,0,0.8); }
+    .post-music-tag .play-btn-small {
+      background: none;
+      border: none;
+      color: #fff;
+      font-size: 16px;
+      cursor: pointer;
+      padding: 0 4px;
+    }
+    .post-actions-right {
+      position: absolute;
+      right: 12px;
+      bottom: 100px;
+      z-index: 3;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 18px;
+      pointer-events: none;
+    }
+    .post-actions-right .action-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      background: none;
+      border: none;
+      color: #fff;
+      font-size: 12px;
+      cursor: pointer;
+      pointer-events: auto;
+      transition: 0.2s;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.8);
+    }
+    .post-actions-right .action-btn i { font-size: 28px; transition: 0.2s; }
+    .post-actions-right .action-btn span { font-weight: 500; font-size: 12px; }
+    .post-actions-right .action-btn.liked { color: #ef4444; }
+    .post-actions-right .action-btn.liked i { transform: scale(1.1); }
+    .post-actions-right .action-btn:hover { transform: scale(1.05); }
+    .post-actions-right .action-btn:active { transform: scale(0.9); }
+    .post-profile-avatar {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.8);
+      overflow: hidden;
+      background: #3b82f6;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      font-weight: 600;
+      color: #fff;
+      pointer-events: auto;
+      cursor: pointer;
+      margin-bottom: 4px;
+      flex-shrink: 0;
+      transition: transform 0.2s;
+      text-transform: uppercase;
+      user-select: none;
+    }
+    .post-profile-avatar:hover { transform: scale(1.05); }
+    .post-profile-avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+    /* ===== IMAGE COUNTER ===== */
+    .image-counter {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: rgba(0,0,0,0.6);
+      color: #fff;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      z-index: 20;
+      backdrop-filter: blur(4px);
+      pointer-events: none;
+    }
+
+    /* ===== EMPTY FEED ===== */
+    .empty-feed {
+      text-align: center;
+      padding: 60px 20px;
+      color: #aaa;
+      font-size: 16px;
+      background: #000;
+      height: calc(100dvh - 70px - 80px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+    }
+    .empty-feed i { font-size: 48px; margin-bottom: 16px; display: block; color: #444; }
+    .empty-feed p { color: #888; }
+
+    /* ===== SEARCH ===== */
+    .search-view {
+      flex: 1;
+      width: 100%;
+      background: #000;
+      padding: 16px 20px;
+      overflow-y: auto;
+      display: none;
+      animation: fadeIn 0.3s ease;
+    }
+    .search-view.active { display: block; }
+    .search-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #222;
+    }
+    .search-header .back-btn {
+      background: none;
+      border: none;
+      font-size: 24px;
+      color: #ccc;
+      cursor: pointer;
+      padding: 4px;
+    }
+    .search-header .back-btn:hover { color: #fff; }
+    .search-header input {
+      flex: 1;
+      padding: 10px 16px;
+      border: 1px solid #333;
+      border-radius: 30px;
+      font-size: 16px;
+      background: #1a1a1a;
+      color: #fff;
+      transition: 0.2s;
+    }
+    .search-header input:focus { border-color: #3b82f6; background: #222; }
+    .search-header input::placeholder { color: #777; }
+    .search-tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 16px;
+      background: #1a1a1a;
+      border-radius: 12px;
+      padding: 4px;
+    }
+    .search-tab {
+      flex: 1;
+      background: none;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 10px;
+      color: #aaa;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: 0.2s;
+      font-family: inherit;
+    }
+    .search-tab.active { background: #2a2a2a; color: #fff; }
+    .search-tab:hover:not(.active) { color: #fff; }
+    .search-results {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding-bottom: 20px;
+    }
+    .search-result-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      background: #1a1a1a;
+      border-radius: 16px;
+      border: 1px solid #2a2a2a;
+      cursor: pointer;
+      transition: 0.2s;
+      color: #eee;
+    }
+    .search-result-item:hover { background: #2a2a2a; transform: scale(1.01); }
+    .search-result-item img {
+      width: 60px;
+      height: 60px;
+      border-radius: 12px;
+      object-fit: cover;
+      background: #333;
+    }
+    .search-result-item .info { flex: 1; }
+    .search-result-item .info .desc { font-size: 14px; color: #eee; font-weight: 500; }
+    .search-result-item .info .tags { font-size: 12px; color: #999; margin-top: 2px; }
+    .search-empty {
+      text-align: center;
+      padding: 40px 20px;
+      color: #888;
+    }
+    .search-empty i { font-size: 48px; display: block; margin-bottom: 12px; color: #444; }
+
+    /* ===== COMMENTS ===== */
+    .comments-overlay {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 2000;
+      background: rgba(0,0,0,0.7);
+      display: none;
+      justify-content: flex-end;
+      flex-direction: column;
+      height: 100%;
+      animation: fadeInOverlay 0.25s ease;
+    }
+    .comments-overlay.active { display: flex; }
+    @keyframes fadeInOverlay { from { opacity: 0; } to { opacity: 1; } }
+    .comments-panel {
+      background: #1a1a1a;
+      border-radius: 24px 24px 0 0;
+      max-height: 75vh;
+      display: flex;
+      flex-direction: column;
+      padding: 20px 20px 16px 20px;
+      animation: slideUp 0.3s ease;
+      color: #eee;
+    }
+    @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+    .comments-panel .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #333;
+    }
+    .comments-panel .panel-header h3 { font-size: 18px; color: #fff; }
+    .comments-panel .panel-header .close-btn {
+      background: none;
+      border: none;
+      font-size: 24px;
+      color: #999;
+      cursor: pointer;
+      padding: 4px;
+    }
+    .comments-panel .panel-header .close-btn:hover { color: #fff; }
+    .comments-list {
+      flex: 1;
+      overflow-y: auto;
+      padding-right: 4px;
+      max-height: 50vh;
+    }
+    .comment-item {
+      display: flex;
+      gap: 10px;
+      padding: 10px 0;
+      border-bottom: 1px solid #2a2a2a;
+    }
+    .comment-item .avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #3b82f6;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      color: #fff;
+      flex-shrink: 0;
+      overflow: hidden;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .comment-item .avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .comment-item .body { flex: 1; }
+    .comment-item .body .author { font-weight: 600; font-size: 14px; color: #ddd; }
+    .comment-item .body .text { font-size: 14px; color: #ccc; margin-top: 2px; word-wrap: break-word; }
+    .comment-item .body .time { font-size: 11px; color: #777; margin-top: 2px; }
+    .comments-input-area {
+      display: flex;
+      gap: 10px;
+      padding-top: 12px;
+      border-top: 1px solid #333;
+      margin-top: 4px;
+    }
+    .comments-input-area input {
+      flex: 1;
+      padding: 10px 16px;
+      border: 1px solid #333;
+      border-radius: 30px;
+      font-size: 14px;
+      background: #111;
+      color: #eee;
+      transition: 0.2s;
+    }
+    .comments-input-area input:focus { border-color: #3b82f6; background: #1a1a1a; }
+    .comments-input-area input::placeholder { color: #777; }
+    .comments-input-area .send-btn {
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      font-size: 18px;
+      cursor: pointer;
+      transition: 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .comments-input-area .send-btn:hover { background: #1d4ed8; transform: scale(1.05); }
+    .no-comments { text-align: center; color: #888; padding: 30px 0; font-size: 14px; }
+
+    /* ===== LOGIN / REGISTER ===== */
+    .login-view {
+      flex: 1;
+      width: 100%;
+      background: #000;
+      padding: 40px 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      animation: fadeIn 0.3s ease;
+      color: #eee;
+    }
+    .login-view .logo { font-size: 48px; color: #3b82f6; margin-bottom: 8px; }
+    .login-view h1 { font-size: 28px; font-weight: 700; color: #fff; margin-bottom: 4px; }
+    .login-view .subtitle { color: #aaa; font-size: 14px; margin-bottom: 32px; }
+    .login-view .form-group { width: 100%; max-width: 320px; margin-bottom: 16px; }
+    .login-view .form-group label { display: block; font-size: 14px; font-weight: 600; color: #ccc; margin-bottom: 4px; }
+    .login-view .form-group input,
+    .login-view .form-group textarea {
+      width: 100%;
+      padding: 12px 16px;
+      border: 1px solid #333;
+      border-radius: 12px;
+      font-size: 15px;
+      background: #1a1a1a;
+      color: #eee;
+    }
+    .login-view .form-group input:focus,
+    .login-view .form-group textarea:focus { border-color: #3b82f6; background: #222; }
+    .login-view .form-group textarea { resize: vertical; min-height: 60px; font-family: inherit; }
+    .login-view .login-btn {
+      width: 100%;
+      max-width: 320px;
+      padding: 12px;
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      border-radius: 30px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: 0.2s;
+      margin-top: 8px;
+    }
+    .login-view .login-btn:hover { background: #1d4ed8; transform: scale(1.02); }
+    .login-view .login-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    .login-view .error-msg { color: #ef4444; font-size: 14px; margin-top: 8px; text-align: center; max-width: 320px; }
+    .login-view p { color: #aaa; font-size: 14px; }
+    .login-view p span { color: #3b82f6; cursor: pointer; }
+    .login-view p span:hover { text-decoration: underline; }
+
+    /* ===== PROFILE ===== */
+    .profile-view,
+    .edit-profile-view,
+    .create-post-view {
+      flex: 1;
+      width: 100%;
+      background: #000;
+      padding: 24px 20px 30px;
+      overflow-y: auto;
+      border-radius: 0;
+      border: none;
+      box-shadow: none;
+      display: none;
+      animation: fadeIn 0.3s ease;
+      color: #eee;
+    }
+    .profile-view.active,
+    .edit-profile-view.active,
+    .create-post-view.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+    .profile-header {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      margin-bottom: 16px;
+      position: relative;
+    }
+    .profile-avatar {
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #1a1a2e, #16213e);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 48px;
+      color: #3b82f6;
+      margin-bottom: 12px;
+      border: 4px solid #333;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .profile-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .profile-name { font-size: 22px; font-weight: 700; color: #fff; margin-bottom: 2px; }
+    .profile-bio { font-size: 14px; color: #aaa; margin-bottom: 12px; max-width: 280px; word-wrap: break-word; }
+    .profile-stats {
+      display: flex;
+      justify-content: space-around;
+      width: 100%;
+      max-width: 300px;
+      margin-bottom: 16px;
+      padding: 10px 0;
+      border-top: 1px solid #222;
+      border-bottom: 1px solid #222;
+    }
+    .profile-stats div { text-align: center; }
+    .profile-stats .number { font-size: 18px; font-weight: 700; color: #fff; }
+    .profile-stats .label { font-size: 12px; color: #888; margin-top: 2px; }
+    .profile-posts { margin-top: 8px; }
+    .profile-posts h4 { font-size: 16px; color: #fff; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+    .profile-posts .post-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .profile-posts .post-item {
+      aspect-ratio: 1 / 1;
+      background: #1a1a1a;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      color: #555;
+      transition: 0.2s;
+      border: 1px solid #2a2a2a;
+      background-size: cover;
+      background-position: center;
+    }
+    .profile-posts .post-item i { font-size: 24px; color: #555; }
+    .profile-actions {
+      display: flex;
+      flex-direction: row;
+      gap: 10px;
+      margin-top: 4px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .follow-btn {
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      padding: 10px 24px;
+      border-radius: 40px;
+      font-size: 15px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      transition: 0.2s;
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+    }
+    .follow-btn:hover { transform: scale(1.02); }
+    .follow-btn.following { background: #333; color: #eee; box-shadow: none; }
+    .follow-btn.following:hover { background: #4a0000; color: #ef4444; }
+    .edit-profile-btn {
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      padding: 10px 24px;
+      border-radius: 40px;
+      font-size: 15px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      transition: 0.2s;
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+    }
+    .edit-profile-btn:hover { background: #1d4ed8; transform: scale(1.02); }
+    .logout-btn {
+      background: #ef4444;
+      color: #fff;
+      border: none;
+      padding: 10px 24px;
+      border-radius: 40px;
+      font-size: 15px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      transition: 0.2s;
+      box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+    }
+    .logout-btn:hover { background: #dc2626; transform: scale(1.02); }
+
+    /* ===== EDIT & CREATE HEADERS ===== */
+    .edit-header, .create-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #222;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .edit-header .back-btn,
+    .create-header .back-btn {
+      background: none;
+      border: none;
+      font-size: 24px;
+      color: #ccc;
+      cursor: pointer;
+      padding: 4px 8px;
+      transition: 0.2s;
+    }
+    .edit-header .back-btn:hover,
+    .create-header .back-btn:hover { color: #fff; }
+    .edit-header h2,
+    .create-header h2 {
+      font-size: 20px;
+      font-weight: 600;
+      color: #fff;
+      flex: 1;
+      text-align: center;
+    }
+    .edit-header .save-btn,
+    .create-header .publish-btn {
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      padding: 8px 20px;
+      border-radius: 30px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: 0.2s;
+      white-space: nowrap;
+    }
+    .edit-header .save-btn:hover,
+    .create-header .publish-btn:hover { background: #1d4ed8; transform: scale(1.02); }
+
+    /* ===== EDIT PROFILE ===== */
+    .edit-avatar-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+    .edit-avatar-section .avatar-preview {
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      background: #1a1a1a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 48px;
+      color: #3b82f6;
+      border: 4px solid #333;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+      overflow: hidden;
+      cursor: pointer;
+      transition: 0.2s;
+      object-fit: cover;
+      position: relative;
+      flex-shrink: 0;
+    }
+    .edit-avatar-section .avatar-preview:hover { opacity: 0.8; transform: scale(1.02); }
+    .edit-avatar-section .avatar-preview img { width: 100%; height: 100%; object-fit: cover; }
+    .edit-avatar-section .avatar-hint { font-size: 13px; color: #888; margin-top: 8px; }
+    .edit-avatar-section input[type="file"] { display: none; }
+    .edit-field, .create-field { margin-bottom: 20px; }
+    .edit-field label, .create-field label { display: block; font-size: 14px; font-weight: 600; color: #ccc; margin-bottom: 6px; }
+    .edit-field input, .edit-field textarea,
+    .create-field input, .create-field textarea, .create-field select {
+      width: 100%;
+      padding: 12px 16px;
+      border: 1px solid #333;
+      border-radius: 12px;
+      font-size: 15px;
+      background: #1a1a1a;
+      color: #eee;
+    }
+    .edit-field input:focus, .edit-field textarea:focus,
+    .create-field input:focus, .create-field textarea:focus, .create-field select:focus {
+      border-color: #3b82f6;
+      background: #222;
+    }
+    .edit-field textarea, .create-field textarea { resize: vertical; min-height: 80px; font-family: inherit; }
+    .create-field select { appearance: auto; background: #1a1a1a; color: #eee; }
+    .create-field select option { background: #1a1a1a; color: #eee; }
+
+    /* ===== MUSIC PLAYER ===== */
+    .music-player-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 4px;
+    }
+    .music-player-wrapper .play-btn {
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: 0.2s;
+      flex-shrink: 0;
+      font-size: 16px;
+    }
+    .music-player-wrapper .play-btn:hover { transform: scale(1.05); background: #1d4ed8; }
+    .music-player-wrapper .play-btn.playing { background: #ef4444; }
+    .music-player-wrapper .play-btn.playing:hover { background: #dc2626; }
+
+    /* ===== CREATE POST - GRID DE IMÁGENES (2 columnas) ===== */
+    .create-images-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      margin-bottom: 16px;
+      background: #111;
+      border-radius: 16px;
+      padding: 8px;
+      border: 2px dashed #333;
+      min-height: 120px;
+    }
+    .create-image-item {
+      position: relative;
+      aspect-ratio: 1 / 1;
+      background: #1a1a1a;
+      border-radius: 12px;
+      overflow: hidden;
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+    }
+    .create-image-item .remove-btn {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      background: rgba(0,0,0,0.7);
+      color: #fff;
+      border: none;
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      font-size: 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: 0.2s;
+      backdrop-filter: blur(4px);
+    }
+    .create-image-item .remove-btn:hover {
+      background: #ef4444;
+      transform: scale(1.1);
+    }
+    .create-images-placeholder {
+      grid-column: 1 / -1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 30px 20px;
+      color: #666;
+    }
+    .create-images-placeholder i { font-size: 48px; margin-bottom: 8px; }
+    .create-images-placeholder span { font-size: 14px; }
+
+    .select-image-btn {
+      display: inline-block;
+      background: #2a2a2a;
+      color: #eee;
+      padding: 8px 18px;
+      border-radius: 30px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: 0.2s;
+      border: none;
+      margin-bottom: 16px;
+    }
+    .select-image-btn:hover { background: #3a3a3a; }
+
+    /* ===== BOTTOM BAR ===== */
+    .bottom-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #000;
+      border-top: 1px solid #222;
+      padding: 8px 20px 12px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+      z-index: 1000;
+      height: 80px;
+      box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.5);
+    }
+    .bottom-bar .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-decoration: none;
+      color: #777;
+      font-size: 12px;
+      font-weight: 500;
+      transition: 0.2s;
+      cursor: pointer;
+      min-width: 56px;
+      padding: 4px 12px;
+      border-radius: 30px;
+      background: none;
+      border: none;
+      font-family: inherit;
+    }
+    .bottom-bar .nav-item i { font-size: 24px; transition: 0.2s; }
+    .bottom-bar .nav-item span { font-size: 10px; letter-spacing: 0.3px; margin-top: 2px; color: #777; }
+    .bottom-bar .nav-item.active { color: #3b82f6; }
+    .bottom-bar .nav-item.active i { transform: translateY(-2px); }
+    .bottom-bar .nav-item.active span { color: #3b82f6; }
+    .bottom-bar .nav-item.plus-btn {
+      background: #2563eb;
+      color: #fff;
+      width: 52px;
+      height: 52px;
+      padding: 0;
+      border-radius: 50%;
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: auto;
+      flex-direction: row;
+      transition: 0.2s;
+      margin-top: 0;
+    }
+    .bottom-bar .nav-item.plus-btn i { font-size: 26px; margin: 0; color: #fff; }
+    .bottom-bar .nav-item.plus-btn span { display: none; }
+    .bottom-bar .nav-item.plus-btn:hover { transform: scale(1.05); background: #1d4ed8; }
+    .bottom-bar .nav-item:not(.plus-btn):hover { color: #ccc; }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 420px) {
+      body { padding-top: 60px; padding-bottom: 70px; }
+      body.top-bar-hidden { padding-top: 0; }
+      .top-bar { height: 60px; padding: 10px 16px; }
+      .top-bar .app-title { font-size: 20px; }
+      .bottom-bar { height: 70px; padding: 6px 12px; }
+      .bottom-bar .nav-item { min-width: 44px; padding: 4px 8px; }
+      .bottom-bar .nav-item i { font-size: 20px; }
+      .bottom-bar .nav-item.plus-btn { width: 46px; height: 46px; }
+      .bottom-bar .nav-item.plus-btn i { font-size: 22px; }
+      .post-card { height: calc(100dvh - 60px - 70px); min-height: 400px; }
+      body.top-bar-hidden .post-card { height: calc(100dvh - 70px); }
+      .post-bottom-left { bottom: 12px; left: 12px; right: 70px; max-width: 75%; }
+      .post-description { font-size: 14px; max-height: 30vh; }
+      .post-music-tag { bottom: 50px; left: 12px; font-size: 12px; padding: 3px 12px; max-width: 75%; }
+      .post-actions-right { right: 6px; bottom: 90px; gap: 14px; }
+      .post-actions-right .action-btn i { font-size: 24px; }
+      .post-actions-right .action-btn span { font-size: 11px; }
+      .post-profile-avatar { width: 40px; height: 40px; font-size: 18px; }
+      .profile-avatar, .edit-avatar-section .avatar-preview { width: 80px; height: 80px; font-size: 36px; }
+      .profile-name { font-size: 20px; }
+      .profile-view, .edit-profile-view, .create-post-view, .search-view, .login-view { padding: 16px 12px 24px; }
+      .edit-header h2, .create-header h2 { font-size: 18px; }
+      .edit-header .save-btn, .create-header .publish-btn { font-size: 13px; padding: 6px 16px; }
+      .profile-stats { max-width: 240px; }
+      .comments-panel { padding: 16px 16px 12px 16px; max-height: 80vh; }
+      .login-view h1 { font-size: 24px; }
+      .profile-actions { flex-direction: row; gap: 8px; margin-top: 2px; }
+      .edit-profile-btn, .logout-btn, .follow-btn { padding: 8px 16px; font-size: 13px; }
+    }
+    @media (max-width: 360px) {
+      .post-bottom-left { right: 60px; max-width: 70%; bottom: 10px; }
+      .post-description { font-size: 13px; }
+      .post-music-tag { bottom: 45px; font-size: 11px; padding: 2px 10px; }
+      .post-actions-right { right: 4px; gap: 12px; bottom: 80px; }
+      .post-actions-right .action-btn i { font-size: 20px; }
+      .post-actions-right .action-btn span { font-size: 10px; }
+      .post-profile-avatar { width: 34px; height: 34px; font-size: 14px; }
+      .profile-actions { flex-direction: column; align-items: center; }
+      .edit-profile-btn, .logout-btn, .follow-btn { width: 100%; justify-content: center; }
+    }
+  </style>
+</head>
+<body>
+  <header class="top-bar" id="topBar">
+    <div class="app-title">
+      <span>SnapPix</span>
+    </div>
+    <button class="search-icon" id="searchBtn">
+      <i class="fas fa-search"></i>
+    </button>
+  </header>
+
+  <main class="main-content" id="mainContent"></main>
+
+  <footer class="bottom-bar">
+    <button class="nav-item active" id="homeBtn">
+      <i class="fas fa-home"></i>
+      <span>Inicio</span>
+    </button>
+    <button class="nav-item plus-btn" id="plusBtn">
+      <i class="fas fa-plus"></i>
+      <span>Nuevo</span>
+    </button>
+    <button class="nav-item" id="profileBtn">
+      <i class="fas fa-user"></i>
+      <span>Perfil</span>
+    </button>
+  </footer>
+
+  <audio id="globalAudio" preload="auto" style="display:none;"></audio>
+
+  <div class="comments-overlay" id="commentsOverlay">
+    <div class="comments-panel">
+      <div class="panel-header">
+        <h3>💬 Comentarios</h3>
+        <button class="close-btn" id="closeCommentsBtn"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="comments-list" id="commentsList">
+        <div class="no-comments">No hay comentarios aún. ¡Sé el primero!</div>
+      </div>
+      <div class="comments-input-area">
+        <input type="text" id="commentInput" placeholder="Escribe un comentario..." />
+        <button class="send-btn" id="sendCommentBtn"><i class="fas fa-paper-plane"></i></button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ============================================================
+    //  CONFIGURACIÓN
+    // ============================================================
+    const firebaseConfig = {
+      apiKey: "AIzaSyDGtzAfPtbbOMUUbkiadVFh_JbXE5IpT0w",
+      authDomain: "snappix-34d39.firebaseapp.com",
+      databaseURL: "https://snappix-34d39-default-rtdb.firebaseio.com",
+      projectId: "snappix-34d39",
+      storageBucket: "snappix-34d39.firebasestorage.app",
+      messagingSenderId: "205291317595",
+      appId: "1:205291317595:web:daabfa9535e4658b1a527e",
+      measurementId: "G-SKWZ7C22M6"
+    };
+
+    const app = firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+    const auth = firebase.auth();
+
+    const IMGBB_API_KEY = '014c7e471ccbaf7040238c8df8cb3e4a';
+    const IMGBB_UPLOAD_URL = 'https://api.imgbb.com/1/upload';
+
+    // ============================================================
+    //  ESTADO GLOBAL
+    // ============================================================
+    let posts = [];
+    let profileData = {
+      name: '',
+      bio: '',
+      avatar: null,
+      likedPosts: [],
+      followers: {},
+      following: {}
+    };
+    let currentUserId = null;
+
+    let editAvatarFile = null;
+    let editAvatarPreview = null;
+    let selectedImagesData = []; // Array de data URLs
+    let musicList = [];
+    let isPlaying = false;
+    let currentFeedAudioPostId = null;
+    let feedObserver = null;
+    let currentCommentPostId = null;
+    let isUpdatingLike = false;
+
+    const MUSIC_JSON_URL = 'https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Data.json';
+
+    const mainContent = document.getElementById('mainContent');
+    const homeBtn = document.getElementById('homeBtn');
+    const profileBtn = document.getElementById('profileBtn');
+    const plusBtn = document.getElementById('plusBtn');
+    const searchBtn = document.getElementById('searchBtn');
+    const topBar = document.getElementById('topBar');
+    const body = document.body;
+    const globalAudio = document.getElementById('globalAudio');
+
+    const commentsOverlay = document.getElementById('commentsOverlay');
+    const commentsList = document.getElementById('commentsList');
+    const commentInput = document.getElementById('commentInput');
+    const sendCommentBtn = document.getElementById('sendCommentBtn');
+    const closeCommentsBtn = document.getElementById('closeCommentsBtn');
+
+    // ============================================================
+    //  FUNCIÓN PARA DETENER TODA LA MÚSICA
+    // ============================================================
+    function stopAllMusic() {
+      globalAudio.pause();
+      if (currentFeedAudioPostId !== null) {
+        updateFeedMusicButtons(currentFeedAudioPostId, false);
+        currentFeedAudioPostId = null;
+      }
+      isPlaying = false;
+      const playBtn = document.getElementById('musicPlayBtn');
+      if (playBtn) {
+        playBtn.innerHTML = '<i class="fas fa-play"></i>';
+        playBtn.classList.remove('playing');
+      }
+      globalAudio.src = '';
+    }
+
+    // ============================================================
+    //  AUTH
+    // ============================================================
+    function showLoginView() {
+      stopAllMusic();
+      clearMainContent();
+      showTopBar(false);
+      homeBtn.classList.remove('active');
+      profileBtn.classList.remove('active');
+
+      const container = document.createElement('div');
+      container.className = 'login-view';
+      container.id = 'loginView';
+      container.innerHTML = `
+        <div class="logo"><i class="fas fa-camera-retro"></i></div>
+        <h1>SnapPix</h1>
+        <p class="subtitle">Inicia sesión para continuar</p>
+        <div class="form-group">
+          <label for="loginEmail">Email</label>
+          <input type="email" id="loginEmail" placeholder="tu@email.com" />
+        </div>
+        <div class="form-group">
+          <label for="loginPassword">Contraseña</label>
+          <input type="password" id="loginPassword" placeholder="••••••••" />
+        </div>
+        <button class="login-btn" id="loginBtn">Iniciar sesión</button>
+        <div class="error-msg" id="loginError"></div>
+        <p style="margin-top:20px; font-size:14px; color:#aaa;">
+          ¿No tienes cuenta? <span style="color:#3b82f6; cursor:pointer;" id="goToRegisterLink">Regístrate</span>
+        </p>
+      `;
+      mainContent.appendChild(container);
+
+      const emailInput = document.getElementById('loginEmail');
+      const passInput = document.getElementById('loginPassword');
+      const loginBtn = document.getElementById('loginBtn');
+      const errorMsg = document.getElementById('loginError');
+
+      const performLogin = () => {
+        const email = emailInput.value.trim();
+        const password = passInput.value;
+        if (!email || !password) {
+          errorMsg.textContent = 'Por favor, completa todos los campos.';
+          return;
+        }
+        loginBtn.disabled = true;
+        loginBtn.textContent = 'Iniciando...';
+        errorMsg.textContent = '';
+        auth.signInWithEmailAndPassword(email, password)
+          .then(() => {})
+          .catch(err => {
+            errorMsg.textContent = err.message;
+            loginBtn.disabled = false;
+            loginBtn.textContent = 'Iniciar sesión';
+          });
+      };
+
+      loginBtn.addEventListener('click', performLogin);
+      passInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') performLogin();
+      });
+      emailInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') passInput.focus();
+      });
+
+      document.getElementById('goToRegisterLink').addEventListener('click', () => {
+        showRegisterView();
+      });
+    }
+
+    function showRegisterView() {
+      stopAllMusic();
+      clearMainContent();
+      showTopBar(false);
+
+      const container = document.createElement('div');
+      container.className = 'login-view';
+      container.id = 'registerView';
+      container.innerHTML = `
+        <div class="logo"><i class="fas fa-user-plus"></i></div>
+        <h1>Crear cuenta</h1>
+        <p class="subtitle">Regístrate para empezar</p>
+        <div class="form-group">
+          <label for="regEmail">Email</label>
+          <input type="email" id="regEmail" placeholder="tu@email.com" />
+        </div>
+        <div class="form-group">
+          <label for="regPassword">Contraseña</label>
+          <input type="password" id="regPassword" placeholder="Mínimo 6 caracteres" />
+        </div>
+        <div class="form-group">
+          <label for="regName">Nombre</label>
+          <input type="text" id="regName" placeholder="Tu nombre" />
+        </div>
+        <div class="form-group">
+          <label for="regBio">Descripción</label>
+          <textarea id="regBio" placeholder="Cuéntanos sobre ti..."></textarea>
+        </div>
+        <button class="login-btn" id="registerBtn">Registrarse</button>
+        <div class="error-msg" id="registerError"></div>
+        <p style="margin-top:20px; font-size:14px; color:#aaa;">
+          ¿Ya tienes cuenta? <span style="color:#3b82f6; cursor:pointer;" id="goToLoginLink">Inicia sesión</span>
+        </p>
+      `;
+      mainContent.appendChild(container);
+
+      const emailInput = document.getElementById('regEmail');
+      const passInput = document.getElementById('regPassword');
+      const nameInput = document.getElementById('regName');
+      const bioInput = document.getElementById('regBio');
+      const registerBtn = document.getElementById('registerBtn');
+      const errorMsg = document.getElementById('registerError');
+
+      const performRegister = () => {
+        const email = emailInput.value.trim();
+        const password = passInput.value;
+        const name = nameInput.value.trim() || 'Usuario';
+        const bio = bioInput.value.trim() || '';
+
+        if (!email || !password) {
+          errorMsg.textContent = 'Por favor, completa email y contraseña.';
+          return;
+        }
+        if (password.length < 6) {
+          errorMsg.textContent = 'La contraseña debe tener al menos 6 caracteres.';
+          return;
+        }
+
+        registerBtn.disabled = true;
+        registerBtn.textContent = 'Creando cuenta...';
+        errorMsg.textContent = '';
+
+        auth.createUserWithEmailAndPassword(email, password)
+          .then((userCredential) => {
+            const user = userCredential.user;
+            const profileRef = database.ref(`users/${user.uid}`);
+            return profileRef.set({
+              name: name,
+              bio: bio,
+              avatar: null,
+              likedPosts: [],
+              followers: {},
+              following: {}
+            });
+          })
+          .catch(err => {
+            errorMsg.textContent = err.message;
+            registerBtn.disabled = false;
+            registerBtn.textContent = 'Registrarse';
+          });
+      };
+
+      registerBtn.addEventListener('click', performRegister);
+      passInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') performRegister();
+      });
+
+      document.getElementById('goToLoginLink').addEventListener('click', () => {
+        showLoginView();
+      });
+    }
+
+    function logout() {
+      auth.signOut().then(() => {}).catch(err => {
+        console.warn('Error al cerrar sesión:', err);
+      });
+    }
+
+    // ============================================================
+    //  PERFIL USUARIO ACTUAL
+    // ============================================================
+    function loadUserProfile(uid) {
+      const profileRef = database.ref(`users/${uid}`);
+      profileRef.on('value', (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+          profileData.name = data.name || 'Usuario';
+          profileData.bio = data.bio || '';
+          profileData.avatar = data.avatar || null;
+          profileData.likedPosts = data.likedPosts || [];
+          profileData.followers = data.followers || {};
+          profileData.following = data.following || {};
+        } else {
+          const defaultProfile = {
+            name: 'Usuario',
+            bio: '',
+            avatar: null,
+            likedPosts: [],
+            followers: {},
+            following: {}
+          };
+          profileRef.set(defaultProfile);
+          Object.assign(profileData, defaultProfile);
+        }
+        loadPostsFromFirebase();
+        const profileView = document.getElementById('profileView');
+        if (profileView) {
+          const viewedUid = profileView.dataset.uid;
+          if (viewedUid === currentUserId) {
+            showProfile(currentUserId);
+          }
+        }
+      });
+    }
+
+    // ============================================================
+    //  FIREBASE POSTS
+    // ============================================================
+    function loadPostsFromFirebase() {
+      const postsRef = database.ref('posts');
+      postsRef.off();
+      postsRef.on('value', (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+          const postsArray = Object.keys(data).map(key => ({
+            id: key,
+            ...data[key]
+          }));
+          postsArray.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+          posts = postsArray;
+        } else {
+          posts = [];
+        }
+        if (profileData.likedPosts && profileData.likedPosts.length > 0) {
+          posts.forEach(post => {
+            post.liked = profileData.likedPosts.includes(post.id);
+          });
+        } else {
+          posts.forEach(post => post.liked = false);
+        }
+
+        if (isUpdatingLike) {
+          return;
+        }
+
+        if (document.getElementById('feedContainer')) {
+          renderFeed();
+        }
+        const profileView = document.getElementById('profileView');
+        if (profileView) {
+          const viewedUid = profileView.dataset.uid;
+          if (viewedUid === currentUserId) {
+            showProfile(currentUserId);
+          }
+        }
+      });
+    }
+
+    function savePostToFirebase(postData) {
+      const postsRef = database.ref('posts');
+      const newPostRef = postsRef.push();
+      return newPostRef.set(postData);
+    }
+
+    function updatePostInFirebase(postId, updates) {
+      const postRef = database.ref(`posts/${postId}`);
+      return postRef.update(updates);
+    }
+
+    function updateUserProfile(uid, data) {
+      const profileRef = database.ref(`users/${uid}`);
+      return profileRef.update(data);
+    }
+
+    function getUserProfile(uid) {
+      return new Promise((resolve, reject) => {
+        const profileRef = database.ref(`users/${uid}`);
+        profileRef.once('value').then(snapshot => {
+          const data = snapshot.val();
+          if (data) {
+            resolve(data);
+          } else {
+            resolve({ name: 'Usuario', bio: '', avatar: null, followers: {}, following: {} });
+          }
+        }).catch(reject);
+      });
+    }
+
+    function followUser(targetUid) {
+      const updates = {};
+      updates[`users/${targetUid}/followers/${currentUserId}`] = true;
+      updates[`users/${currentUserId}/following/${targetUid}`] = true;
+      return database.ref().update(updates);
+    }
+
+    function unfollowUser(targetUid) {
+      const updates = {};
+      updates[`users/${targetUid}/followers/${currentUserId}`] = null;
+      updates[`users/${currentUserId}/following/${targetUid}`] = null;
+      return database.ref().update(updates);
+    }
+
+    // ============================================================
+    //  IMGBB
+    // ============================================================
+    function uploadImageToImgbb(imageDataUrl) {
+      return new Promise((resolve, reject) => {
+        fetch(imageDataUrl)
+          .then(res => res.blob())
+          .then(blob => {
+            const formData = new FormData();
+            formData.append('key', IMGBB_API_KEY);
+            formData.append('image', blob, 'image.jpg');
+            fetch(IMGBB_UPLOAD_URL, {
+              method: 'POST',
+              body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+              if (data.success) {
+                resolve(data.data.url);
+              } else {
+                reject(new Error('Error en ImgBB: ' + (data.error?.message || 'Desconocido')));
+              }
+            })
+            .catch(reject);
+          })
+          .catch(reject);
+      });
+    }
+
+    function uploadMultipleImages(imagesData) {
+      return new Promise((resolve, reject) => {
+        let urls = [];
+        let completed = 0;
+        if (imagesData.length === 0) {
+          resolve([]);
+          return;
+        }
+        imagesData.forEach((imgData, index) => {
+          uploadImageToImgbb(imgData)
+            .then(url => {
+              urls.push(url);
+              completed++;
+              const loadingMsg = document.querySelector('.upload-progress-msg');
+              if (loadingMsg) {
+                loadingMsg.textContent = `Subiendo imagen ${completed} de ${imagesData.length}...`;
+              }
+              if (completed === imagesData.length) {
+                resolve(urls);
+              }
+            })
+            .catch(err => {
+              reject(err);
+            });
+        });
+      });
+    }
+
+    // ============================================================
+    //  MÚSICA
+    // ============================================================
+    async function loadMusicFromJson() {
+      try {
+        const response = await fetch(MUSIC_JSON_URL);
+        if (!response.ok) throw new Error('Error al cargar la música');
+        const data = await response.json();
+        if (Array.isArray(data) && data.length > 0) {
+          musicList = data.map(item => ({
+            value: item.file,
+            label: `🎵 ${item.title}`
+          }));
+        } else {
+          throw new Error('Formato de datos inválido');
+        }
+      } catch (error) {
+        console.warn('Error al cargar música desde GitHub, usando lista por defecto:', error);
+        musicList = [
+          { value: '', label: 'Sin música' },
+          { value: 'https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Musica/MONTAGEM.mp3', label: '🎵 MONTAGEM' },
+          { value: 'https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Musica/NOOTFUNK.mp3', label: '🎵 NOOTFUNK' },
+        ];
+      }
+      updateMusicSelect();
+    }
+
+    function updateMusicSelect() {
+      const select = document.getElementById('createMusicSelect');
+      if (!select) return;
+      const currentValue = select.value;
+      select.innerHTML = '';
+      musicList.forEach(opt => {
+        const option = document.createElement('option');
+        option.value = opt.value;
+        option.textContent = opt.label;
+        select.appendChild(option);
+      });
+      if (currentValue) {
+        select.value = currentValue;
+      }
+      const playBtn = document.getElementById('musicPlayBtn');
+      if (playBtn) {
+        playBtn.classList.remove('playing');
+        playBtn.innerHTML = '<i class="fas fa-play"></i>';
+      }
+      isPlaying = false;
+    }
+
+    function toggleCreatePlay() {
+      const select = document.getElementById('createMusicSelect');
+      const url = select.value;
+      const playBtn = document.getElementById('musicPlayBtn');
+      if (!url) {
+        stopAllMusic();
+        return;
+      }
+      if (isPlaying && globalAudio.src === url && !globalAudio.paused) {
+        stopAllMusic();
+      } else {
+        stopAllMusic();
+        playCreateMusic(url);
+      }
+    }
+
+    function playCreateMusic(url) {
+      if (globalAudio.src !== url) {
+        globalAudio.src = url;
+        globalAudio.load();
+      }
+      const playFn = () => {
+        globalAudio.play().then(() => {
+          isPlaying = true;
+          const playBtn = document.getElementById('musicPlayBtn');
+          if (playBtn) {
+            playBtn.innerHTML = '<i class="fas fa-pause"></i>';
+            playBtn.classList.add('playing');
+          }
+        }).catch(err => {
+          console.warn('Error al reproducir en creación:', err);
+          isPlaying = false;
+          const playBtn = document.getElementById('musicPlayBtn');
+          if (playBtn) {
+            playBtn.innerHTML = '<i class="fas fa-play"></i>';
+            playBtn.classList.remove('playing');
+          }
+        });
+      };
+      if (globalAudio.readyState >= 2) {
+        playFn();
+      } else {
+        globalAudio.addEventListener('canplaythrough', playFn, { once: true });
+        setTimeout(() => {
+          if (!isPlaying) {
+            globalAudio.removeEventListener('canplaythrough', playFn);
+            playFn();
+          }
+        }, 3000);
+      }
+    }
+
+    // ------------------------------------------------------------
+    //  FEED MUSIC PLAYER
+    // ------------------------------------------------------------
+    function playFeedMusic(postId, url) {
+      if (!url) return;
+      stopAllMusic();
+      if (globalAudio.src !== url) {
+        globalAudio.src = url;
+        globalAudio.load();
+      } else {
+        globalAudio.currentTime = 0;
+      }
+
+      const playFn = () => {
+        globalAudio.play().then(() => {
+          currentFeedAudioPostId = postId;
+          updateFeedMusicButtons(postId, true);
+        }).catch(err => {
+          console.warn('Error al reproducir en feed:', err);
+          currentFeedAudioPostId = null;
+          updateFeedMusicButtons(postId, false);
+        });
+      };
+
+      if (globalAudio.readyState >= 2) {
+        playFn();
+      } else {
+        globalAudio.addEventListener('canplaythrough', playFn, { once: true });
+        setTimeout(() => {
+          if (currentFeedAudioPostId !== postId) {
+            globalAudio.removeEventListener('canplaythrough', playFn);
+            playFn();
+          }
+        }, 3000);
+      }
+    }
+
+    function toggleFeedMusic(postId, url) {
+      if (currentFeedAudioPostId === postId && !globalAudio.paused) {
+        stopAllMusic();
+      } else {
+        playFeedMusic(postId, url);
+      }
+    }
+
+    function updateFeedMusicButtons(postId, isPlayingNow) {
+      document.querySelectorAll('.post-card').forEach(card => {
+        const id = card.dataset.postId;
+        const btn = card.querySelector('.play-btn-small');
+        if (id === postId && btn) {
+          btn.innerHTML = isPlayingNow ? '<i class="fas fa-pause"></i>' : '<i class="fas fa-play"></i>';
+        } else if (btn) {
+          btn.innerHTML = '<i class="fas fa-play"></i>';
+        }
+      });
+    }
+
+    // ---- FEED AUTO PLAY ----
+    function setupFeedAutoPlay() {
+      if (feedObserver) {
+        feedObserver.disconnect();
+        feedObserver = null;
+      }
+      const container = document.getElementById('feedContainer');
+      if (!container) return;
+      feedObserver = new IntersectionObserver((entries) => {
+        let mostVisiblePost = null;
+        let maxRatio = 0;
+        entries.forEach(entry => {
+          if (entry.isIntersecting && entry.intersectionRatio > maxRatio) {
+            maxRatio = entry.intersectionRatio;
+            mostVisiblePost = entry.target;
+          }
+        });
+        if (mostVisiblePost) {
+          const postId = mostVisiblePost.dataset.postId;
+          const post = posts.find(p => p.id === postId);
+          if (post && post.musicUrl) {
+            if (currentFeedAudioPostId !== postId) {
+              playFeedMusic(postId, post.musicUrl);
+            }
+          } else {
+            stopAllMusic();
+          }
+        } else {
+          stopAllMusic();
+        }
+      }, {
+        threshold: [0.3, 0.5, 0.7],
+        root: mainContent,
+        rootMargin: '0px'
+      });
+      document.querySelectorAll('.post-card').forEach(card => {
+        feedObserver.observe(card);
+      });
+    }
+
+    // ---- UI HELPERS ----
+    function showTopBar(show) {
+      if (show) {
+        topBar.classList.remove('hidden');
+        body.classList.remove('top-bar-hidden');
+      } else {
+        topBar.classList.add('hidden');
+        body.classList.add('top-bar-hidden');
+      }
+    }
+
+    // ---- RENDER FEED ----
+    function renderFeed() {
+      const container = document.createElement('div');
+      container.className = 'feed-container';
+      container.id = 'feedContainer';
+
+      if (posts.length === 0) {
+        container.innerHTML = `
+          <div class="empty-feed">
+            <i class="fas fa-plus-circle"></i>
+            <p>No hay publicaciones aún</p>
+            <p style="font-size:14px; margin-top:8px; color:#666;">Toca el botón + para crear tu primera publicación</p>
+          </div>
+        `;
+        mainContent.innerHTML = '';
+        mainContent.appendChild(container);
+        return;
+      }
+
+      posts.forEach(post => {
+        const postCard = document.createElement('div');
+        postCard.className = 'post-card';
+        postCard.dataset.postId = post.id;
+
+        let images = [];
+        if (post.images && Array.isArray(post.images) && post.images.length > 0) {
+          images = post.images;
+        } else if (post.imageUrl) {
+          images = [post.imageUrl];
+        }
+
+        const carousel = document.createElement('div');
+        carousel.className = 'post-image-carousel';
+
+        if (images.length === 0) {
+          const slide = document.createElement('div');
+          slide.className = 'carousel-slide';
+          slide.style.background = '#111';
+          slide.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#555;font-size:48px;"><i class="fas fa-image"></i></div>';
+          carousel.appendChild(slide);
+        } else {
+          images.forEach(url => {
+            const slide = document.createElement('div');
+            slide.className = 'carousel-slide';
+            slide.style.backgroundImage = `url('${url}')`;
+            carousel.appendChild(slide);
+          });
+        }
+
+        postCard.appendChild(carousel);
+
+        // --- CONTADOR DE IMÁGENES (solo si hay más de 1) ---
+        if (images.length > 1) {
+          const counter = document.createElement('div');
+          counter.className = 'image-counter';
+          counter.textContent = `1/${images.length}`;
+          counter.dataset.total = images.length;
+          postCard.appendChild(counter);
+
+          // Actualizar contador al hacer scroll
+          carousel.addEventListener('scroll', function() {
+            const total = parseInt(counter.dataset.total, 10);
+            const slideWidth = this.querySelector('.carousel-slide')?.offsetWidth || 1;
+            const scrollLeft = this.scrollLeft;
+            const index = Math.round(scrollLeft / slideWidth) + 1;
+            counter.textContent = `${Math.min(index, total)}/${total}`;
+          });
+        }
+
+        const authorUid = post.authorUid || post.authorId || 'unknown';
+        const authorName = post.authorName || 'Usuario';
+        let authorAvatar = post.authorAvatar || null;
+
+        let displayAvatar = authorAvatar;
+        if (authorUid === currentUserId && profileData.avatar) {
+          displayAvatar = profileData.avatar;
+        }
+
+        let avatarContent = '';
+        if (displayAvatar) {
+          avatarContent = `<img src="${displayAvatar}" alt="Avatar" />`;
+        } else {
+          const initials = authorName.split(' ').map(word => word[0]).join('').toUpperCase().slice(0, 2);
+          const hue = Math.abs(authorName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) * 137) % 360;
+          avatarContent = `<span style="background:hsl(${hue}, 70%, 50%); display:flex; align-items:center; justify-content:center; width:100%; height:100%; border-radius:50%; font-size:20px; font-weight:600; color:white;">${initials || '?'}</span>`;
+        }
+
+        const likedClass = post.liked ? 'liked' : '';
+        const commentCount = post.comments ? post.comments.length : 0;
+
+        let descHtml = post.description || 'Sin descripción';
+        descHtml = descHtml.replace(/#(\w+)/g, '<span class="hashtag">#$1</span>');
+
+        let musicHtml = '';
+        if (post.musicUrl) {
+          musicHtml = `
+            <div class="post-music-tag" data-post-id="${post.id}" data-music-url="${post.musicUrl}">
+              <i class="fas fa-music"></i>
+              <span>${post.musicTitle || 'Música'}</span>
+              <button class="play-btn-small"><i class="fas fa-play"></i></button>
+            </div>
+          `;
+        }
+
+        const bottomLeft = document.createElement('div');
+        bottomLeft.className = 'post-bottom-left';
+        bottomLeft.innerHTML = `<div class="post-description">${descHtml}</div>`;
+
+        const actionsRight = document.createElement('div');
+        actionsRight.className = 'post-actions-right';
+        actionsRight.innerHTML = `
+          <div class="post-profile-avatar" data-author-uid="${authorUid}">${avatarContent}</div>
+          <button class="action-btn like-btn ${likedClass}" data-post-id="${post.id}">
+            <i class="fas fa-heart"></i>
+            <span class="like-count">${post.likes || 0}</span>
+          </button>
+          <button class="action-btn comment-btn" data-post-id="${post.id}">
+            <i class="fas fa-comment"></i>
+            <span class="comment-count">${commentCount}</span>
+          </button>
+        `;
+
+        postCard.appendChild(bottomLeft);
+        if (musicHtml) {
+          const musicDiv = document.createElement('div');
+          musicDiv.innerHTML = musicHtml;
+          postCard.appendChild(musicDiv.firstElementChild);
+        }
+        postCard.appendChild(actionsRight);
+
+        container.appendChild(postCard);
+      });
+
+      mainContent.innerHTML = '';
+      mainContent.appendChild(container);
+
+      // Event Listeners
+      container.querySelectorAll('.post-profile-avatar').forEach(avatarDiv => {
+        avatarDiv.addEventListener('click', function(e) {
+          e.stopPropagation();
+          const uid = this.dataset.authorUid;
+          if (uid && uid !== 'unknown') {
+            showUserProfile(uid);
+          } else {
+            showProfile(currentUserId);
+          }
+        });
+      });
+
+      container.querySelectorAll('.like-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          const postId = this.dataset.postId;
+          toggleLike(postId);
+        });
+      });
+
+      container.querySelectorAll('.comment-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          const postId = this.dataset.postId;
+          openComments(postId);
+        });
+      });
+
+      container.querySelectorAll('.post-music-tag').forEach(tag => {
+        const playBtn = tag.querySelector('.play-btn-small');
+        const postId = tag.dataset.postId;
+        const musicUrl = tag.dataset.musicUrl;
+        if (playBtn && musicUrl) {
+          playBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            toggleFeedMusic(postId, musicUrl);
+          });
+          tag.addEventListener('click', function(e) {
+            if (e.target.closest('.play-btn-small')) return;
+            toggleFeedMusic(postId, musicUrl);
+          });
+        }
+      });
+
+      setTimeout(() => {
+        setupFeedAutoPlay();
+        const firstCard = container.querySelector('.post-card');
+        if (firstCard) {
+          firstCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 150);
+    }
+
+    // ---- ACTUALIZAR LIKE EN DOM ----
+    function updateLikeInDOM(postId, isLiked, newLikes) {
+      const postCard = document.querySelector(`.post-card[data-post-id="${postId}"]`);
+      if (!postCard) return;
+      const likeBtn = postCard.querySelector('.like-btn');
+      const likeCount = postCard.querySelector('.like-count');
+      if (likeBtn) {
+        likeBtn.classList.toggle('liked', isLiked);
+      }
+      if (likeCount) {
+        likeCount.textContent = newLikes;
+      }
+    }
+
+    // ---- LIKES ----
+    function toggleLike(postId) {
+      const post = posts.find(p => p.id === postId);
+      if (!post) return;
+      const isLiked = post.liked;
+      const newLiked = !isLiked;
+      const newLikes = (post.likes || 0) + (newLiked ? 1 : -1);
+
+      post.liked = newLiked;
+      post.likes = newLikes;
+
+      let updatedLikedPosts = [...profileData.likedPosts];
+      if (newLiked) {
+        if (!updatedLikedPosts.includes(postId)) {
+          updatedLikedPosts.push(postId);
+        }
+      } else {
+        updatedLikedPosts = updatedLikedPosts.filter(id => id !== postId);
+      }
+      profileData.likedPosts = updatedLikedPosts;
+
+      updateLikeInDOM(postId, newLiked, newLikes);
+
+      isUpdatingLike = true;
+
+      const updates = { likedPosts: updatedLikedPosts };
+      updateUserProfile(auth.currentUser.uid, updates)
+        .then(() => {
+          return updatePostInFirebase(postId, { likes: newLikes });
+        })
+        .then(() => {
+          isUpdatingLike = false;
+        })
+        .catch(err => {
+          console.warn('Error al actualizar like:', err);
+          post.liked = isLiked;
+          post.likes = (post.likes || 0) + (newLiked ? -1 : 1);
+          profileData.likedPosts = isLiked ? [...profileData.likedPosts, postId] : profileData.likedPosts.filter(id => id !== postId);
+          updateLikeInDOM(postId, isLiked, post.likes);
+          isUpdatingLike = false;
+        });
+    }
+
+    // ---- COMENTARIOS ----
+    function openComments(postId) {
+      stopAllMusic();
+      const post = posts.find(p => p.id === postId);
+      if (!post) return;
+      currentCommentPostId = postId;
+      if (!post.comments) post.comments = [];
+      renderComments(post.comments);
+      commentsOverlay.classList.add('active');
+      commentInput.value = '';
+      commentInput.focus();
+    }
+
+    function closeComments() {
+      commentsOverlay.classList.remove('active');
+      currentCommentPostId = null;
+    }
+
+    function renderComments(comments) {
+      if (!comments || comments.length === 0) {
+        commentsList.innerHTML = `<div class="no-comments">No hay comentarios aún. ¡Sé el primero!</div>`;
+        return;
+      }
+      let html = '';
+      comments.forEach(comment => {
+        const avatarHtml = comment.avatar
+          ? `<img src="${comment.avatar}" alt="avatar" />`
+          : `<span style="font-size:14px;">${(comment.author || '?').charAt(0).toUpperCase()}</span>`;
+        html += `
+          <div class="comment-item">
+            <div class="avatar">${avatarHtml}</div>
+            <div class="body">
+              <div class="author">${comment.author || 'Anónimo'}</div>
+              <div class="text">${comment.text}</div>
+              <div class="time">${comment.timestamp || 'Ahora'}</div>
+            </div>
+          </div>
+        `;
+      });
+      commentsList.innerHTML = html;
+      commentsList.scrollTop = commentsList.scrollHeight;
+    }
+
+    function addComment() {
+      const text = commentInput.value.trim();
+      if (!text || currentCommentPostId === null) return;
+      const post = posts.find(p => p.id === currentCommentPostId);
+      if (!post) return;
+      if (!post.comments) post.comments = [];
+      const newComment = {
+        author: profileData.name,
+        text: text,
+        timestamp: new Date().toLocaleString(),
+        avatar: profileData.avatar || null
+      };
+      post.comments.push(newComment);
+      updatePostInFirebase(post.id, {
+        comments: post.comments
+      }).catch(err => {
+        console.warn('Error al guardar comentario en Firebase:', err);
+      });
+      renderComments(post.comments);
+      commentInput.value = '';
+      const commentCountSpan = document.querySelector(`.post-card[data-post-id="${post.id}"] .comment-count`);
+      if (commentCountSpan) {
+        commentCountSpan.textContent = post.comments.length;
+      }
+    }
+
+    // ---- BÚSQUEDA ----
+    let searchActiveTab = 'posts';
+    let searchQuery = '';
+
+    function showSearchView() {
+      stopAllMusic();
+      closeComments();
+      clearMainContent();
+      showTopBar(false);
+
+      const container = document.createElement('div');
+      container.className = 'search-view active';
+      container.id = 'searchView';
+
+      container.innerHTML = `
+        <div class="search-header">
+          <button class="back-btn" id="searchBackBtn"><i class="fas fa-arrow-left"></i></button>
+          <input type="text" id="searchInput" placeholder="Buscar..." autofocus />
+        </div>
+        <div class="search-tabs">
+          <button class="search-tab active" data-tab="posts">Publicaciones</button>
+          <button class="search-tab" data-tab="users">Usuarios</button>
+        </div>
+        <div class="search-results" id="searchResults">
+          <div class="search-empty">
+            <i class="fas fa-search"></i>
+            <p>Escribe una palabra para buscar</p>
+          </div>
+        </div>
+      `;
+
+      mainContent.appendChild(container);
+
+      const searchInput = document.getElementById('searchInput');
+      const searchResults = document.getElementById('searchResults');
+      const tabs = container.querySelectorAll('.search-tab');
+
+      tabs.forEach(tab => {
+        tab.addEventListener('click', function() {
+          tabs.forEach(t => t.classList.remove('active'));
+          this.classList.add('active');
+          searchActiveTab = this.dataset.tab;
+          performSearch(searchInput.value.trim());
+        });
+      });
+
+      searchInput.addEventListener('input', function() {
+        searchQuery = this.value.trim();
+        performSearch(searchQuery);
+      });
+
+      document.getElementById('searchBackBtn').addEventListener('click', closeSearch);
+      setTimeout(() => searchInput.focus(), 100);
+    }
+
+    function performSearch(query) {
+      const searchResults = document.getElementById('searchResults');
+      if (!searchResults) return;
+
+      if (query.length === 0) {
+        searchResults.innerHTML = `
+          <div class="search-empty">
+            <i class="fas fa-search"></i>
+            <p>Escribe una palabra para buscar</p>
+          </div>
+        `;
+        return;
+      }
+
+      if (searchActiveTab === 'posts') {
+        const results = posts.filter(post => {
+          const desc = post.description.toLowerCase();
+          return desc.includes(query.toLowerCase());
+        });
+
+        if (results.length === 0) {
+          searchResults.innerHTML = `
+            <div class="search-empty">
+              <i class="fas fa-times-circle"></i>
+              <p>No se encontraron publicaciones con "${query}"</p>
+            </div>
+          `;
+          return;
+        }
+
+        let html = '';
+        results.forEach(post => {
+          const preview = post.description.length > 60 ? post.description.substring(0, 60) + '...' : post.description;
+          let imgSrc = '';
+          if (post.images && post.images.length > 0) imgSrc = post.images[0];
+          else if (post.imageUrl) imgSrc = post.imageUrl;
+
+          html += `
+            <div class="search-result-item" data-post-id="${post.id}">
+              ${imgSrc ? `<img src="${imgSrc}" alt="Preview" />` : `<div style="width:60px;height:60px;border-radius:12px;background:#2a2a2a;display:flex;align-items:center;justify-content:center;color:#555;"><i class="fas fa-image"></i></div>`}
+              <div class="info">
+                <div class="desc">${preview}</div>
+                <div class="tags">${post.musicTitle ? '🎵 ' + post.musicTitle : ''}</div>
+              </div>
+            </div>
+          `;
+        });
+        searchResults.innerHTML = html;
+
+        searchResults.querySelectorAll('.search-result-item').forEach(item => {
+          item.addEventListener('click', function() {
+            const postId = this.dataset.postId;
+            closeSearchAndGoToPost(postId);
+          });
+        });
+      } else {
+        searchUsers(query).then(users => {
+          if (users.length === 0) {
+            searchResults.innerHTML = `
+              <div class="search-empty">
+                <i class="fas fa-users-slash"></i>
+                <p>No se encontraron usuarios con "${query}"</p>
+              </div>
+            `;
+            return;
+          }
+
+          let html = '';
+          users.forEach(user => {
+            const avatarHtml = user.avatar
+              ? `<img src="${user.avatar}" alt="Avatar" />`
+              : `<div style="width:60px;height:60px;border-radius:12px;background:#2a2a2a;display:flex;align-items:center;justify-content:center;color:#555;font-size:24px;"><i class="fas fa-user"></i></div>`;
+            html += `
+              <div class="search-result-item" data-uid="${user.uid}">
+                ${avatarHtml}
+                <div class="info">
+                  <div class="desc">${user.name}</div>
+                  <div class="tags">${user.bio || ''}</div>
+                </div>
+              </div>
+            `;
+          });
+          searchResults.innerHTML = html;
+
+          searchResults.querySelectorAll('.search-result-item').forEach(item => {
+            item.addEventListener('click', function() {
+              const uid = this.dataset.uid;
+              if (uid) {
+                closeSearch();
+                showUserProfile(uid);
+              }
+            });
+          });
+        }).catch(err => {
+          console.warn('Error al buscar usuarios:', err);
+          searchResults.innerHTML = `
+            <div class="search-empty">
+              <i class="fas fa-exclamation-triangle"></i>
+              <p>Error al buscar usuarios</p>
+            </div>
+          `;
+        });
+      }
+    }
+
+    function searchUsers(query) {
+      return new Promise((resolve, reject) => {
+        if (!query || query.length < 1) {
+          resolve([]);
+          return;
+        }
+        const usersRef = database.ref('users');
+        const searchTerm = query.toLowerCase();
+        usersRef.orderByChild('name').startAt(query).endAt(query + '\uf8ff').once('value')
+          .then(snapshot => {
+            const data = snapshot.val();
+            if (!data) {
+              resolve([]);
+              return;
+            }
+            const results = [];
+            Object.keys(data).forEach(uid => {
+              const user = data[uid];
+              if (user.name && user.name.toLowerCase().includes(searchTerm)) {
+                results.push({
+                  uid: uid,
+                  name: user.name || 'Usuario',
+                  bio: user.bio || '',
+                  avatar: user.avatar || null
+                });
+              }
+            });
+            resolve(results);
+          })
+          .catch(err => reject(err));
+      });
+    }
+
+    function closeSearch() {
+      const searchView = document.getElementById('searchView');
+      if (searchView) searchView.remove();
+      showHome();
+    }
+
+    function closeSearchAndGoToPost(postId) {
+      const searchView = document.getElementById('searchView');
+      if (searchView) searchView.remove();
+      showHome();
+      setTimeout(() => {
+        const cards = document.querySelectorAll('.post-card');
+        let targetCard = null;
+        cards.forEach(card => {
+          if (card.dataset.postId === postId) {
+            targetCard = card;
+          }
+        });
+        if (targetCard) {
+          targetCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 300);
+    }
+
+    // ============================================================
+    //  CREAR POST (con imágenes precargadas)
+    // ============================================================
+    function createPost(imagesData, description, musicUrl, musicTitle) {
+      const loadingMsg = document.createElement('div');
+      loadingMsg.className = 'upload-progress-msg';
+      loadingMsg.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.9);color:white;padding:20px 30px;border-radius:16px;z-index:9999;font-size:16px;text-align:center;';
+      loadingMsg.innerHTML = `Subiendo imagen 0 de ${imagesData.length}...`;
+      document.body.appendChild(loadingMsg);
+
+      uploadMultipleImages(imagesData)
+        .then(imageUrls => {
+          loadingMsg.textContent = 'Guardando publicación...';
+          const postData = {
+            images: imageUrls,
+            description: description.trim() || 'Sin descripción',
+            musicUrl: musicUrl || '',
+            musicTitle: musicTitle || '',
+            likes: 0,
+            liked: false,
+            comments: [],
+            timestamp: Date.now(),
+            authorName: profileData.name,
+            authorUid: auth.currentUser.uid,
+            authorAvatar: profileData.avatar || null
+          };
+          return savePostToFirebase(postData);
+        })
+        .then(() => {
+          loadingMsg.remove();
+          showHome();
+        })
+        .catch(err => {
+          loadingMsg.remove();
+          alert('Error al publicar: ' + err.message);
+          console.error(err);
+        });
+    }
+
+    // ---- VISTA CREAR POST (con GRID de imágenes) ----
+    function showCreatePost(preloadedImages = []) {
+      stopAllMusic();
+      closeComments();
+      if (preloadedImages.length > 0) {
+        selectedImagesData = preloadedImages;
+      } else {
+        selectedImagesData = [];
+      }
+      clearMainContent();
+      showTopBar(false);
+
+      const container = document.createElement('div');
+      container.className = 'create-post-view active';
+      container.id = 'createPostView';
+
+      let musicOptionsHtml = musicList.map(opt =>
+        `<option value="${opt.value}">${opt.label}</option>`
+      ).join('');
+
+      container.innerHTML = `
+        <div class="create-header">
+          <button class="back-btn" id="createBackBtn"><i class="fas fa-arrow-left"></i></button>
+          <h2>Nueva publicación</h2>
+          <button class="publish-btn" id="createPublishBtn">Publicar</button>
+        </div>
+        <div class="create-images-grid" id="createImagesGrid">
+          <div class="create-images-placeholder">
+            <i class="fas fa-images"></i>
+            <span>Selecciona imágenes</span>
+          </div>
+        </div>
+        <button class="select-image-btn" id="selectImageBtn"><i class="fas fa-camera"></i> Seleccionar imágenes</button>
+        <input type="file" id="createImageInput" accept="image/*" multiple style="display:none;" />
+        <div class="create-field">
+          <label for="createDescInput">Descripción (usa #etiquetas)</label>
+          <textarea id="createDescInput" placeholder="Escribe una descripción..."></textarea>
+        </div>
+        <div class="create-field">
+          <label for="createMusicSelect">Música</label>
+          <div class="music-player-wrapper">
+            <select id="createMusicSelect">
+              ${musicOptionsHtml}
+            </select>
+            <button class="play-btn" id="musicPlayBtn"><i class="fas fa-play"></i></button>
+          </div>
+        </div>
+      `;
+
+      mainContent.appendChild(container);
+
+      // ====== FUNCIÓN PARA ACTUALIZAR LA GRID ======
+      function updateImageGrid() {
+        const grid = document.getElementById('createImagesGrid');
+        if (!grid) return;
+
+        // Limpiar grid (excepto el placeholder que se eliminará)
+        grid.innerHTML = '';
+
+        if (selectedImagesData.length === 0) {
+          grid.innerHTML = `
+            <div class="create-images-placeholder">
+              <i class="fas fa-images"></i>
+              <span>Selecciona imágenes</span>
+            </div>
+          `;
+          return;
+        }
+
+        selectedImagesData.forEach((dataUrl, index) => {
+          const item = document.createElement('div');
+          item.className = 'create-image-item';
+          item.style.backgroundImage = `url('${dataUrl}')`;
+
+          const removeBtn = document.createElement('button');
+          removeBtn.className = 'remove-btn';
+          removeBtn.innerHTML = '<i class="fas fa-times"></i>';
+          removeBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            selectedImagesData.splice(index, 1);
+            updateImageGrid();
+          });
+
+          item.appendChild(removeBtn);
+          grid.appendChild(item);
+        });
+      }
+
+      // ====== BOTÓN SELECCIONAR IMÁGENES ======
+      document.getElementById('selectImageBtn').addEventListener('click', function() {
+        document.getElementById('createImageInput').click();
+      });
+
+      document.getElementById('createImageInput').addEventListener('change', function(e) {
+        const files = e.target.files;
+        if (!files || files.length === 0) return;
+        let loaded = 0;
+        const newImages = [];
+        for (let i = 0; i < files.length; i++) {
+          const reader = new FileReader();
+          reader.onload = function(ev) {
+            newImages.push(ev.target.result);
+            loaded++;
+            if (loaded === files.length) {
+              selectedImagesData = selectedImagesData.concat(newImages);
+              updateImageGrid();
+            }
+          };
+          reader.readAsDataURL(files[i]);
+        }
+        this.value = '';
+      });
+
+      // ====== BOTÓN VOLVER ======
+      container.querySelector('#createBackBtn').addEventListener('click', function() {
+        stopAllMusic();
+        showHome();
+      });
+
+      // ====== PUBLICAR ======
+      container.querySelector('#createPublishBtn').addEventListener('click', function() {
+        if (selectedImagesData.length === 0) {
+          alert('Por favor, selecciona al menos una imagen.');
+          return;
+        }
+        const description = document.getElementById('createDescInput').value.trim() || 'Sin descripción';
+        const musicSelect = document.getElementById('createMusicSelect');
+        const selectedOption = musicSelect.options[musicSelect.selectedIndex];
+        const musicUrl = musicSelect.value;
+        const musicTitle = selectedOption ? selectedOption.text.replace(/^🎵\s*/, '') : '';
+        createPost(selectedImagesData, description, musicUrl, musicTitle);
+        stopAllMusic();
+      });
+
+      // ====== MÚSICA ======
+      const musicSelect = document.getElementById('createMusicSelect');
+      const playBtn = document.getElementById('musicPlayBtn');
+
+      musicSelect.addEventListener('change', function() {
+        stopAllMusic();
+        const url = this.value;
+        if (url) {
+          globalAudio.src = url;
+          globalAudio.load();
+        }
+        playBtn.innerHTML = '<i class="fas fa-play"></i>';
+        playBtn.classList.remove('playing');
+        isPlaying = false;
+      });
+
+      playBtn.addEventListener('click', function() {
+        toggleCreatePlay();
+      });
+
+      if (musicSelect.value) {
+        globalAudio.src = musicSelect.value;
+        globalAudio.load();
+      }
+
+      // ====== INICIALIZAR GRID ======
+      updateImageGrid();
+    }
+
+    // ============================================================
+    //  PERFIL
+    // ============================================================
+    function createProfileView(uid, userData, isOwnProfile = false) {
+      const container = document.createElement('div');
+      container.className = 'profile-view active';
+      container.id = 'profileView';
+      container.dataset.uid = uid;
+
+      let avatarContent = '';
+      if (userData.avatar) {
+        avatarContent = `<img src="${userData.avatar}" alt="Avatar" />`;
+      } else {
+        avatarContent = `<i class="fas fa-user-circle"></i>`;
+      }
+
+      let totalLikes = 0;
+      const userPosts = posts.filter(p => p.authorUid === uid);
+      userPosts.forEach(post => {
+        totalLikes += (post.likes || 0);
+      });
+
+      const followersCount = userData.followers ? Object.keys(userData.followers).length : 0;
+      const followingCount = userData.following ? Object.keys(userData.following).length : 0;
+
+      let actionsHtml = '';
+      if (isOwnProfile) {
+        actionsHtml = `
+          <div class="profile-actions">
+            <button class="edit-profile-btn" id="editProfileBtn"><i class="fas fa-pen"></i> Editar perfil</button>
+            <button class="logout-btn" id="logoutBtn"><i class="fas fa-sign-out-alt"></i> Cerrar sesión</button>
+          </div>
+        `;
+      } else {
+        const isFollowing = userData.followers && userData.followers[currentUserId] === true;
+        const followBtnClass = isFollowing ? 'following' : '';
+        const followBtnText = isFollowing ? 'Siguiendo' : 'Seguir';
+        actionsHtml = `
+          <div class="profile-actions">
+            <button class="follow-btn ${followBtnClass}" id="followBtn">${followBtnText}</button>
+          </div>
+        `;
+      }
+
+      container.innerHTML = `
+        <div class="profile-header">
+          <div class="profile-avatar">${avatarContent}</div>
+          <div class="profile-name" id="profileNameDisplay">${userData.name || 'Usuario'}</div>
+          <div class="profile-bio" id="profileBioDisplay">${userData.bio || ''}</div>
+          <div class="profile-stats">
+            <div><div class="number">${totalLikes}</div><div class="label">Me gustas</div></div>
+            <div><div class="number" id="followersCount">${followersCount}</div><div class="label">Seguidores</div></div>
+            <div><div class="number">${followingCount}</div><div class="label">Siguiendo</div></div>
+          </div>
+          ${actionsHtml}
+        </div>
+        <div class="profile-posts">
+          <h4><i class="fas fa-th"></i> ${isOwnProfile ? 'Mis publicaciones' : 'Publicaciones'}</h4>
+          <div class="post-grid" id="profilePostGrid">
+            ${userPosts.length === 0 ? '<p style="color:#888; text-align:center; grid-column:1/-1;">No hay publicaciones aún</p>' : ''}
+            ${userPosts.slice().reverse().map(post => {
+              let imgUrl = '';
+              if (post.images && post.images.length > 0) imgUrl = post.images[0];
+              else if (post.imageUrl) imgUrl = post.imageUrl;
+              return `<div class="post-item" style="background-image:url(${imgUrl}); background-size:cover; background-position:center;">
+                ${imgUrl ? '' : '<i class="fas fa-image"></i>'}
+              </div>`;
+            }).join('')}
+          </div>
+        </div>
+      `;
+
+      if (isOwnProfile) {
+        container.querySelector('#editProfileBtn').addEventListener('click', showEditProfile);
+        container.querySelector('#logoutBtn').addEventListener('click', logout);
+      } else {
+        const followBtn = container.querySelector('#followBtn');
+        const followersSpan = container.querySelector('#followersCount');
+
+        followBtn.addEventListener('click', function() {
+          const currentlyFollowing = this.classList.contains('following');
+          const targetUid = uid;
+          const action = currentlyFollowing ? unfollowUser(targetUid) : followUser(targetUid);
+
+          action.then(() => {
+            if (currentlyFollowing) {
+              delete userData.followers[currentUserId];
+            } else {
+              userData.followers[currentUserId] = true;
+            }
+            const newCount = Object.keys(userData.followers).length;
+            if (followersSpan) followersSpan.textContent = newCount;
+            this.classList.toggle('following');
+            this.textContent = currentlyFollowing ? 'Seguir' : 'Siguiendo';
+          }).catch(err => {
+            console.warn('Error al seguir/dejar de seguir:', err);
+          });
+        });
+      }
+
+      return container;
+    }
+
+    // ---- MOSTRAR PERFIL DE UN USUARIO ----
+    function showUserProfile(uid) {
+      stopAllMusic();
+      closeComments();
+      clearMainContent();
+      showTopBar(false);
+      homeBtn.classList.remove('active');
+      profileBtn.classList.add('active');
+
+      if (uid === currentUserId) {
+        const profileView = createProfileView(uid, profileData, true);
+        mainContent.appendChild(profileView);
+      } else {
+        getUserProfile(uid).then(userData => {
+          const profileView = createProfileView(uid, userData, false);
+          mainContent.appendChild(profileView);
+        }).catch(err => {
+          console.warn('Error al cargar perfil de usuario:', err);
+          const profileView = createProfileView(uid, { name: 'Usuario', bio: '', avatar: null, followers: {}, following: {} }, false);
+          mainContent.appendChild(profileView);
+        });
+      }
+    }
+
+    // ---- MOSTRAR PERFIL ACTUAL ----
+    function showProfile(uid) {
+      if (!uid) uid = currentUserId;
+      showUserProfile(uid);
+    }
+
+    // ---- EDITAR PERFIL ----
+    function createEditProfileView() {
+      const container = document.createElement('div');
+      container.className = 'edit-profile-view active';
+      container.id = 'editProfileView';
+
+      let avatarPreviewHtml = '';
+      if (profileData.avatar) {
+        avatarPreviewHtml = `<img src="${profileData.avatar}" alt="Avatar" id="editAvatarImg" />`;
+      } else {
+        avatarPreviewHtml = `<i class="fas fa-user-circle placeholder-icon" id="editAvatarPlaceholder"></i>`;
+      }
+
+      container.innerHTML = `
+        <div class="edit-header">
+          <button class="back-btn" id="editBackBtn"><i class="fas fa-arrow-left"></i></button>
+          <h2>Editar perfil</h2>
+          <button class="save-btn" id="editSaveBtn">Guardar</button>
+        </div>
+        <div class="edit-avatar-section">
+          <div class="avatar-preview" id="editAvatarPreview">${avatarPreviewHtml}</div>
+          <div class="avatar-hint">Toca la foto para cambiarla</div>
+          <input type="file" id="editAvatarInput" accept="image/*" />
+        </div>
+        <div class="edit-field">
+          <label for="editNameInput">Nombre</label>
+          <input type="text" id="editNameInput" value="${profileData.name}" placeholder="Tu nombre" />
+        </div>
+        <div class="edit-field">
+          <label for="editBioInput">Descripción</label>
+          <textarea id="editBioInput" placeholder="Cuéntanos sobre ti">${profileData.bio}</textarea>
+        </div>
+      `;
+
+      container.querySelector('#editBackBtn').addEventListener('click', function() {
+        stopAllMusic();
+        showProfile(currentUserId);
+      });
+      container.querySelector('#editSaveBtn').addEventListener('click', saveProfileData);
+      const avatarPreview = container.querySelector('#editAvatarPreview');
+      const fileInput = container.querySelector('#editAvatarInput');
+      avatarPreview.addEventListener('click', () => fileInput.click());
+      fileInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(ev) {
+          const dataUrl = ev.target.result;
+          avatarPreview.innerHTML = `<img src="${dataUrl}" alt="Avatar" id="editAvatarImg" />`;
+          editAvatarPreview = dataUrl;
+          editAvatarFile = file;
+        };
+        reader.readAsDataURL(file);
+      });
+
+      return container;
+    }
+
+    function saveProfileData() {
+      const editView = document.getElementById('editProfileView');
+      if (!editView) return;
+      const nameInput = editView.querySelector('#editNameInput');
+      const bioInput = editView.querySelector('#editBioInput');
+      const newName = nameInput.value.trim() || 'Usuario';
+      const newBio = bioInput.value.trim() || '';
+
+      const updates = {
+        name: newName,
+        bio: newBio
+      };
+
+      let avatarPromise = Promise.resolve();
+      if (editAvatarPreview) {
+        avatarPromise = uploadImageToImgbb(editAvatarPreview)
+          .then(url => {
+            updates.avatar = url;
+          })
+          .catch(err => {
+            console.warn('Error al subir avatar:', err);
+            alert('Error al subir la foto de perfil.');
+          });
+      }
+
+      avatarPromise.then(() => {
+        return updateUserProfile(auth.currentUser.uid, updates);
+      }).then(() => {
+        profileData.name = newName;
+        profileData.bio = newBio;
+        if (updates.avatar) {
+          profileData.avatar = updates.avatar;
+        }
+        showProfile(currentUserId);
+      }).catch(err => {
+        alert('Error al guardar perfil: ' + err.message);
+        console.error(err);
+      });
+    }
+
+    // ---- NAVEGACIÓN ----
+    function clearMainContent() {
+      mainContent.innerHTML = '';
+    }
+
+    function showHome() {
+      stopAllMusic();
+      closeComments();
+      clearMainContent();
+      showTopBar(true);
+      homeBtn.classList.add('active');
+      profileBtn.classList.remove('active');
+      renderFeed();
+    }
+
+    function showEditProfile() {
+      stopAllMusic();
+      closeComments();
+      clearMainContent();
+      showTopBar(false);
+      const editView = createEditProfileView();
+      mainContent.appendChild(editView);
+      homeBtn.classList.remove('active');
+      profileBtn.classList.add('active');
+    }
+
+    // ============================================================
+    //  AUTH LISTENER
+    // ============================================================
+    auth.onAuthStateChanged((user) => {
+      if (user) {
+        currentUserId = user.uid;
+        loadUserProfile(user.uid);
+        showHome();
+      } else {
+        currentUserId = null;
+        showLoginView();
+        homeBtn.classList.remove('active');
+        profileBtn.classList.remove('active');
+      }
+    });
+
+    // ============================================================
+    //  EVENTOS UI
+    // ============================================================
+    homeBtn.addEventListener('click', () => {
+      if (auth.currentUser) showHome();
+    });
+    profileBtn.addEventListener('click', () => {
+      if (auth.currentUser) showProfile(currentUserId);
+    });
+
+    searchBtn.addEventListener('click', () => {
+      if (auth.currentUser) showSearchView();
+    });
+
+    // --- Botón "+" abre selector de archivos directamente ---
+    plusBtn.addEventListener('click', function() {
+      if (!auth.currentUser) return;
+      const fileInput = document.createElement('input');
+      fileInput.type = 'file';
+      fileInput.accept = 'image/*';
+      fileInput.multiple = true;
+      fileInput.style.display = 'none';
+      document.body.appendChild(fileInput);
+      fileInput.click();
+
+      fileInput.addEventListener('change', function(e) {
+        const files = e.target.files;
+        if (!files || files.length === 0) {
+          fileInput.remove();
+          return;
+        }
+        let loaded = 0;
+        const imageData = [];
+        for (let i = 0; i < files.length; i++) {
+          const reader = new FileReader();
+          reader.onload = function(ev) {
+            imageData.push(ev.target.result);
+            loaded++;
+            if (loaded === files.length) {
+              fileInput.remove();
+              showCreatePost(imageData);
+            }
+          };
+          reader.readAsDataURL(files[i]);
+        }
+      });
+
+      window.addEventListener('focus', function() {
+        setTimeout(() => {
+          if (fileInput.parentNode) fileInput.remove();
+        }, 1000);
+      }, { once: true });
+    });
+
+    closeCommentsBtn.addEventListener('click', closeComments);
+    commentsOverlay.addEventListener('click', function(e) {
+      if (e.target === this) closeComments();
+    });
+    sendCommentBtn.addEventListener('click', addComment);
+    commentInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        addComment();
+      }
+    });
+
+    loadMusicFromJson().catch(() => {});
+  </script>
+</body>
+</html>
