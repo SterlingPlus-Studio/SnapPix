@@ -276,7 +276,7 @@
       pointer-events: none;
     }
 
-    /* ===== EMPTY FEED ===== */
+    /* ===== EMPTY FEED & LOADING ===== */
     .empty-feed {
       text-align: center;
       padding: 60px 20px;
@@ -292,6 +292,21 @@
     }
     .empty-feed i { font-size: 48px; margin-bottom: 16px; display: block; color: #444; }
     .empty-feed p { color: #888; }
+
+    .loading-feed {
+      text-align: center;
+      padding: 60px 20px;
+      color: #aaa;
+      background: #000;
+      height: calc(100dvh - 70px - 80px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+    }
+    .loading-feed i { font-size: 48px; margin-bottom: 16px; display: block; color: #3b82f6; animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
     /* ===== SEARCH ===== */
     .search-view {
@@ -608,6 +623,42 @@
       text-align: center;
     }
     .music-picker-item .check.hidden { visibility: hidden; }
+    .music-picker-item .music-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+      margin-left: auto;
+    }
+    .music-picker-item .preview-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: none;
+      background: #2d3748;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: 0.2s;
+      flex-shrink: 0;
+    }
+    .music-picker-item .preview-btn:hover {
+      background: #3b82f6;
+      transform: scale(1.05);
+    }
+    .music-picker-item .preview-btn.playing {
+      background: #ef4444;
+    }
+    .music-picker-item .preview-btn.playing:hover {
+      background: #dc2626;
+    }
+    .music-picker-item .preview-btn i {
+      font-size: 13px;
+      margin-left: 1px;
+    }
+
 
     /* ===== DIALOGO DE DESCARGA (carrusel horizontal) ===== */
     .download-overlay {
@@ -1409,6 +1460,15 @@
     // Control de reproducción automática
     let autoPlayAttempted = false;
 
+    // Carga de posts
+    let isPostsLoading = true;
+
+    // Vista previa de música en el selector
+    const musicPickerPreviewAudio = new Audio();
+    musicPickerPreviewAudio.preload = 'none';
+    let musicPreviewButton = null;
+    let musicPreviewUrl = '';
+
     const MUSIC_JSON_URL = 'https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Data.json';
 
     const mainContent = document.getElementById('mainContent');
@@ -1721,13 +1781,13 @@
           return indexA - indexB;
         });
 
-        if (isUpdatingLike) {
-          return;
-        }
+        isPostsLoading = false;
 
+        // Si el feed está visible, actualizarlo
         if (document.getElementById('feedContainer')) {
-          syncFeedUI();
+          updateFeedContainer();
         }
+        // Actualizar perfil si está visible
         const profileView = document.getElementById('profileView');
         if (profileView) {
           const viewedUid = profileView.dataset.uid;
@@ -1738,85 +1798,54 @@
       });
     }
 
-    function syncFeedUI() {
-      const container = document.getElementById('feedContainer');
-      if (!container) return;
+    // ============================================================
+    //  FUNCIÓN PARA ACTUALIZAR EL CONTENEDOR DEL FEED
+    // ============================================================
+    function updateFeedContainer() {
+      let container = document.getElementById('feedContainer');
+      if (!container) {
+        container = document.createElement('div');
+        container.className = 'feed-container';
+        container.id = 'feedContainer';
+        mainContent.appendChild(container);
+      }
+      // Limpiar y mostrar estado
+      container.innerHTML = '';
 
-      const cards = container.querySelectorAll('.post-card');
-      const existingIds = new Set();
-      cards.forEach(card => {
-        const id = card.dataset.postId;
-        if (id) existingIds.add(id);
-        const post = posts.find(p => p.id === id);
-        if (post) {
-          updateCardFromPost(card, post);
-        }
+      if (isPostsLoading) {
+        container.innerHTML = `
+          <div class="loading-feed">
+            <i class="fas fa-spinner"></i>
+            <p>Cargando publicaciones...</p>
+          </div>
+        `;
+        return;
+      }
+
+      if (posts.length === 0) {
+        container.innerHTML = `
+          <div class="empty-feed">
+            <i class="fas fa-plus-circle"></i>
+            <p>No hay publicaciones aún</p>
+            <p style="font-size:14px; margin-top:8px; color:#666;">Toca el botón + para crear tu primera publicación</p>
+          </div>
+        `;
+        return;
+      }
+
+      posts.forEach(post => {
+        const card = createPostCard(post);
+        container.appendChild(card);
       });
 
-      const newPosts = posts.filter(p => !existingIds.has(p.id));
-      if (newPosts.length > 0) {
-        newPosts.forEach(post => {
-          const card = createPostCard(post);
-          const idx = postOrder.indexOf(post.id);
-          let inserted = false;
-          const children = container.children;
-          for (let i = 0; i < children.length; i++) {
-            const childId = children[i].dataset.postId;
-            if (childId) {
-              const childIdx = postOrder.indexOf(childId);
-              if (childIdx > idx) {
-                container.insertBefore(card, children[i]);
-                inserted = true;
-                break;
-              }
-            }
-          }
-          if (!inserted) {
-            container.appendChild(card);
-          }
-        });
+      setTimeout(() => {
         setupFeedAutoPlay();
         tryAutoPlayFirstMusic();
-      }
-    }
-
-    function updateCardFromPost(card, post) {
-      const likeCount = card.querySelector('.like-count');
-      if (likeCount) likeCount.textContent = post.likes || 0;
-      const likeBtn = card.querySelector('.like-btn');
-      if (likeBtn) {
-        if (post.liked) {
-          likeBtn.classList.add('liked');
-        } else {
-          likeBtn.classList.remove('liked');
+        const firstCard = container.querySelector('.post-card');
+        if (firstCard) {
+          firstCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
-      }
-      const commentCount = card.querySelector('.comment-count');
-      if (commentCount) {
-        const comments = post.comments || [];
-        commentCount.textContent = comments.length;
-      }
-      const descDiv = card.querySelector('.post-description');
-      if (descDiv) {
-        let descHtml = post.description || 'Sin descripción';
-        descHtml = descHtml.replace(/#(\w+)/g, '<span class="hashtag">#$1</span>');
-        descDiv.innerHTML = descHtml;
-      }
-      const avatarDiv = card.querySelector('.post-profile-avatar');
-      if (avatarDiv) {
-        let displayAvatar = post.authorAvatar || null;
-        if (post.authorUid === currentUserId && profileData.avatar) {
-          displayAvatar = profileData.avatar;
-        }
-        if (displayAvatar) {
-          avatarDiv.innerHTML = `<img src="${displayAvatar}" alt="Avatar" />`;
-        } else {
-          const name = post.authorName || 'Usuario';
-          const initials = name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
-          const hue = Math.abs(name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) * 137) % 360;
-          avatarDiv.innerHTML = `<span style="background:hsl(${hue}, 70%, 50%); display:flex; align-items:center; justify-content:center; width:100%; height:100%; border-radius:50%; font-size:20px; font-weight:600; color:white;">${initials || '?'}</span>`;
-        }
-      }
+      }, 150);
     }
 
     // ---- Toggle música al tocar el carrusel ----
@@ -2248,11 +2277,9 @@
           },
         ];
       }
-      // Actualizar el selector de música (botón y lista)
       updateMusicPicker();
     }
 
-    // Función para obtener un color a partir de un string (para el cover)
     function stringToColor(str) {
       let hash = 0;
       for (let i = 0; i < str.length; i++) {
@@ -2284,6 +2311,69 @@
       }
 
       return candidates;
+    }
+
+
+    function resetMusicPreview() {
+      if (musicPreviewButton) {
+        musicPreviewButton.classList.remove('playing');
+        musicPreviewButton.innerHTML = '<i class="fas fa-play"></i>';
+      }
+      musicPreviewButton = null;
+      musicPreviewUrl = '';
+      musicPickerPreviewAudio.pause();
+      musicPickerPreviewAudio.currentTime = 0;
+      musicPickerPreviewAudio.src = '';
+    }
+
+    function toggleMusicPreview(item, button, event) {
+      if (event) event.stopPropagation();
+      if (!item || !item.value) return;
+
+      if (musicPreviewUrl === item.value && !musicPickerPreviewAudio.paused) {
+        resetMusicPreview();
+        return;
+      }
+
+      if (musicPreviewButton && musicPreviewButton !== button) {
+        musicPreviewButton.classList.remove('playing');
+        musicPreviewButton.innerHTML = '<i class="fas fa-play"></i>';
+      }
+
+      musicPreviewButton = button;
+      musicPreviewUrl = item.value;
+
+      musicPickerPreviewAudio.pause();
+      musicPickerPreviewAudio.src = item.value;
+      musicPickerPreviewAudio.currentTime = 0;
+
+      const playPromise = musicPickerPreviewAudio.play();
+      if (playPromise && typeof playPromise.then === 'function') {
+        playPromise.then(function() {
+          if (musicPreviewButton === button) {
+            button.classList.add('playing');
+            button.innerHTML = '<i class="fas fa-pause"></i>';
+          }
+        }).catch(function(err) {
+          console.warn('No se pudo reproducir la vista previa:', err);
+          if (musicPreviewButton === button) {
+            button.classList.remove('playing');
+            button.innerHTML = '<i class="fas fa-play"></i>';
+          }
+        });
+      } else {
+        button.classList.add('playing');
+        button.innerHTML = '<i class="fas fa-pause"></i>';
+      }
+
+      musicPickerPreviewAudio.onended = function() {
+        if (musicPreviewButton === button) {
+          button.classList.remove('playing');
+          button.innerHTML = '<i class="fas fa-play"></i>';
+          musicPreviewButton = null;
+          musicPreviewUrl = '';
+        }
+      };
     }
 
     function renderMusicCover(coverEl, item, fallbackHtml) {
@@ -2321,16 +2411,13 @@
       tryNext();
     }
 
-    // Actualiza el botón de selección de música y la lista del picker
     function updateMusicPicker() {
       const selectBtn = document.getElementById('musicSelectBtn');
       const list = document.getElementById('musicPickerList');
       if (!selectBtn || !list) return;
 
-      // Guardar selección actual
       const currentValue = selectBtn.dataset.value || '';
 
-      // Actualizar botón
       const selected = musicList.find(m => m.value === currentValue) || musicList[0] || { value: '', label: 'Sin música', icon: '' };
       const coverDiv = selectBtn.querySelector('.cover');
       const infoSpan = selectBtn.querySelector('.info');
@@ -2341,53 +2428,54 @@
         infoSpan.textContent = selected.label || 'Sin música';
       }
 
-      // Actualizar lista del picker
       list.innerHTML = '';
-      musicList.forEach((item, index) => {
+      musicList.forEach(function(item) {
         const div = document.createElement('div');
         div.className = 'music-picker-item';
         if (item.value === currentValue) {
           div.style.background = '#2a2a2a';
         }
+
+        const actions = document.createElement('div');
+        actions.className = 'music-actions';
+
+        const check = document.createElement('div');
+        check.className = 'check' + (item.value === currentValue ? '' : ' hidden');
+        check.innerHTML = '<i class="fas fa-check-circle"></i>';
+
+        const previewBtn = document.createElement('button');
+        previewBtn.type = 'button';
+        previewBtn.className = 'preview-btn';
+        previewBtn.innerHTML = '<i class="fas fa-play"></i>';
+        previewBtn.addEventListener('click', function(e) {
+          toggleMusicPreview(item, previewBtn, e);
+        });
+
         const cover = document.createElement('div');
         cover.className = 'cover';
         renderMusicCover(cover, item, '🎵');
 
         const info = document.createElement('div');
         info.className = 'info';
-        info.innerHTML = `<div class="title">${item.label || 'Sin música'}</div><div class="sub">${item.value ? 'Canción' : 'Sin audio'}</div>`;
+        info.innerHTML = '<div class="title">' + (item.label || 'Sin música') + '</div><div class="sub">' + (item.value ? 'Canción' : 'Sin audio') + '</div>';
 
-        const check = document.createElement('div');
-        check.className = 'check' + (item.value === currentValue ? '' : ' hidden');
-        check.innerHTML = '<i class="fas fa-check-circle"></i>';
+        actions.appendChild(check);
+        actions.appendChild(previewBtn);
 
         div.appendChild(cover);
         div.appendChild(info);
-        div.appendChild(check);
+        div.appendChild(actions);
 
         div.addEventListener('click', function() {
-          // Actualizar selección
           selectBtn.dataset.value = item.value;
-          // Cerrar picker
+          resetMusicPreview();
           closeMusicPicker();
-          // Actualizar el botón
           updateMusicPicker();
-          // Cambiar el audio si se seleccionó una canción
           if (item.value) {
             globalAudio.src = item.value;
             globalAudio.load();
-            // Si estaba sonando, reiniciar
-            if (isPlaying) {
-              globalAudio.play().catch(() => {});
-            }
           } else {
             stopAllMusic();
-          }
-          // Actualizar el botón de play en creación
-          const playBtn = document.getElementById('musicPlayBtn');
-          if (playBtn) {
-            playBtn.innerHTML = '<i class="fas fa-play"></i>';
-            playBtn.classList.remove('playing');
           }
         });
 
@@ -2396,13 +2484,14 @@
     }
 
     function openMusicPicker() {
+
       musicPickerOverlay.classList.add('active');
-      // Actualizar lista para reflejar selección actual
       updateMusicPicker();
     }
 
     function closeMusicPicker() {
       musicPickerOverlay.classList.remove('active');
+      resetMusicPreview();
     }
 
     // ============================================================
@@ -2531,39 +2620,8 @@
 
     // ---- RENDER FEED ----
     function renderFeed() {
-      const container = document.createElement('div');
-      container.className = 'feed-container';
-      container.id = 'feedContainer';
-
-      if (posts.length === 0) {
-        container.innerHTML = `
-          <div class="empty-feed">
-            <i class="fas fa-plus-circle"></i>
-            <p>No hay publicaciones aún</p>
-            <p style="font-size:14px; margin-top:8px; color:#666;">Toca el botón + para crear tu primera publicación</p>
-          </div>
-        `;
-        mainContent.innerHTML = '';
-        mainContent.appendChild(container);
-        return;
-      }
-
-      posts.forEach(post => {
-        const card = createPostCard(post);
-        container.appendChild(card);
-      });
-
-      mainContent.innerHTML = '';
-      mainContent.appendChild(container);
-
-      setTimeout(() => {
-        setupFeedAutoPlay();
-        tryAutoPlayFirstMusic();
-        const firstCard = container.querySelector('.post-card');
-        if (firstCard) {
-          firstCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-      }, 150);
+      // Esta función ahora usa updateFeedContainer para mantener consistencia
+      updateFeedContainer();
     }
 
     // ---- NAVEGAR A POST ----
@@ -3116,7 +3174,6 @@
       container.className = 'create-post-view active';
       container.id = 'createPostView';
 
-      // Seleccionar la primera canción por defecto (o la que estaba)
       const defaultMusic = musicList[0] || { value: '', label: 'Sin música' };
 
       container.innerHTML = `
@@ -3145,7 +3202,6 @@
               <span class="info">${defaultMusic.label}</span>
               <span class="arrow"><i class="fas fa-chevron-down"></i></span>
             </button>
-            <button class="play-btn" id="musicPlayBtn"><i class="fas fa-play"></i></button>
           </div>
         </div>
       `;
@@ -3161,53 +3217,6 @@
         openMusicPicker();
       });
 
-      // Evento play/pause en creación
-      document.getElementById('musicPlayBtn').addEventListener('click', function() {
-        const selectBtn = document.getElementById('musicSelectBtn');
-        const url = selectBtn.dataset.value || '';
-        if (!url) {
-          alert('Selecciona una canción primero.');
-          return;
-        }
-        if (isPlaying && globalAudio.src === url && !globalAudio.paused) {
-          stopAllMusic();
-        } else {
-          stopAllMusic();
-          if (globalAudio.src !== url) {
-            globalAudio.src = url;
-            globalAudio.load();
-          }
-          const playFn = () => {
-            globalAudio.play().then(() => {
-              isPlaying = true;
-              const playBtn = document.getElementById('musicPlayBtn');
-              if (playBtn) {
-                playBtn.innerHTML = '<i class="fas fa-pause"></i>';
-                playBtn.classList.add('playing');
-              }
-            }).catch(err => {
-              console.warn('Error al reproducir en creación:', err);
-              isPlaying = false;
-              const playBtn = document.getElementById('musicPlayBtn');
-              if (playBtn) {
-                playBtn.innerHTML = '<i class="fas fa-play"></i>';
-                playBtn.classList.remove('playing');
-              }
-            });
-          };
-          if (globalAudio.readyState >= 2) {
-            playFn();
-          } else {
-            globalAudio.addEventListener('canplaythrough', playFn, { once: true });
-            setTimeout(() => {
-              if (!isPlaying) {
-                globalAudio.removeEventListener('canplaythrough', playFn);
-                playFn();
-              }
-            }, 3000);
-          }
-        }
-      });
 
       // Grid de imágenes
       function updateImageGrid() {
@@ -3240,29 +3249,51 @@
         });
       }
 
-      document.getElementById('selectImageBtn').addEventListener('click', function() {
-        document.getElementById('createImageInput').click();
-      });
+      // SELECCIÓN DE IMÁGENES (corregido)
+      const selectImageBtn = document.getElementById('selectImageBtn');
+      const createImageInput = document.getElementById('createImageInput');
 
-      document.getElementById('createImageInput').addEventListener('change', function(e) {
-        const files = e.target.files;
-        if (!files || files.length === 0) return;
-        let loaded = 0;
-        const newImages = [];
-        for (let i = 0; i < files.length; i++) {
+      function readFileAsDataUrl(file) {
+        return new Promise(function(resolve, reject) {
           const reader = new FileReader();
           reader.onload = function(ev) {
-            newImages.push(ev.target.result);
-            loaded++;
-            if (loaded === files.length) {
-              selectedImagesData = selectedImagesData.concat(newImages);
-              updateImageGrid();
-            }
+            resolve(ev.target.result);
           };
-          reader.readAsDataURL(files[i]);
-        }
-        this.value = '';
-      });
+          reader.onerror = function() {
+            reject(new Error('No se pudo leer la imagen.'));
+          };
+          reader.readAsDataURL(file);
+        });
+      }
+
+      if (selectImageBtn && createImageInput) {
+        selectImageBtn.addEventListener('click', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          createImageInput.value = '';
+          createImageInput.click();
+        });
+
+        createImageInput.addEventListener('change', async function(e) {
+          const files = Array.from(e.target.files || []);
+          if (!files.length) return;
+
+          try {
+            const loadedImages = await Promise.all(files.map(function(file) {
+              return readFileAsDataUrl(file);
+            }));
+            selectedImagesData = selectedImagesData.concat(loadedImages);
+            updateImageGrid();
+          } catch (err) {
+            console.warn('Error al cargar imágenes seleccionadas:', err);
+            alert('No se pudieron agregar todas las imágenes seleccionadas.');
+          } finally {
+            this.value = '';
+          }
+        });
+      } else {
+        console.warn('No se encontraron los elementos para seleccionar imágenes');
+      }
 
       container.querySelector('#createBackBtn').addEventListener('click', function() {
         stopAllMusic();
@@ -3280,6 +3311,7 @@
         const selectedMusic = musicList.find(m => m.value === musicUrl);
         const musicTitle = selectedMusic ? selectedMusic.label : '';
         createPost(selectedImagesData, description, musicUrl, musicTitle);
+        resetMusicPreview();
         stopAllMusic();
       });
 
@@ -3544,7 +3576,7 @@
       showTopBar(true);
       homeBtn.classList.add('active');
       profileBtn.classList.remove('active');
-      renderFeed();
+      updateFeedContainer();
     }
 
     function showEditProfile() {
