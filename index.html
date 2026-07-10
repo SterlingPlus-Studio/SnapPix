@@ -159,6 +159,7 @@
       scroll-behavior: smooth;
       background: #000;
       z-index: 1;
+      cursor: pointer;
     }
     .post-image-carousel::-webkit-scrollbar { display: none; }
     .carousel-slide {
@@ -170,6 +171,7 @@
       scroll-snap-align: start;
       scroll-snap-stop: always;
       background-color: #000;
+      pointer-events: none;
     }
     .post-card::after {
       content: '';
@@ -203,34 +205,6 @@
       color: #fff;
     }
     .post-description .hashtag { color: #60a5fa; font-weight: 500; }
-    .post-music-tag {
-      position: absolute;
-      bottom: 60px;
-      left: 16px;
-      z-index: 3;
-      color: rgba(255,255,255,0.9);
-      font-size: 13px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background: rgba(0,0,0,0.6);
-      backdrop-filter: blur(4px);
-      padding: 4px 14px;
-      border-radius: 30px;
-      pointer-events: auto;
-      cursor: pointer;
-      max-width: 70%;
-      transition: 0.2s;
-    }
-    .post-music-tag:hover { background: rgba(0,0,0,0.8); }
-    .post-music-tag .play-btn-small {
-      background: none;
-      border: none;
-      color: #fff;
-      font-size: 16px;
-      cursor: pointer;
-      padding: 0 4px;
-    }
     .post-actions-right {
       position: absolute;
       right: 12px;
@@ -532,6 +506,240 @@
     .comments-input-area .send-btn:hover { background: #1d4ed8; transform: scale(1.05); }
     .no-comments { text-align: center; color: #888; padding: 30px 0; font-size: 14px; }
 
+    /* ===== MUSIC PICKER (similar a comments) ===== */
+    .music-picker-overlay {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 2001;
+      background: rgba(0,0,0,0.7);
+      display: none;
+      justify-content: flex-end;
+      flex-direction: column;
+      height: 100%;
+      animation: fadeInOverlay 0.25s ease;
+    }
+    .music-picker-overlay.active { display: flex; }
+    .music-picker-panel {
+      background: #1a1a1a;
+      border-radius: 24px 24px 0 0;
+      max-height: 70vh;
+      display: flex;
+      flex-direction: column;
+      padding: 20px 20px 16px 20px;
+      animation: slideUp 0.3s ease;
+      color: #eee;
+    }
+    .music-picker-panel .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #333;
+    }
+    .music-picker-panel .panel-header h3 {
+      font-size: 18px;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .music-picker-panel .panel-header .close-btn {
+      background: none;
+      border: none;
+      font-size: 24px;
+      color: #999;
+      cursor: pointer;
+      padding: 4px;
+    }
+    .music-picker-panel .panel-header .close-btn:hover { color: #fff; }
+    .music-picker-list {
+      flex: 1;
+      overflow-y: auto;
+      padding-right: 4px;
+      max-height: 50vh;
+    }
+    .music-picker-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 10px;
+      border-bottom: 1px solid #2a2a2a;
+      cursor: pointer;
+      transition: 0.2s;
+      border-radius: 12px;
+    }
+    .music-picker-item:hover { background: #2a2a2a; }
+    .music-picker-item .cover {
+      width: 48px;
+      height: 48px;
+      border-radius: 8px;
+      background: #333;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      color: #aaa;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+    .music-picker-item .cover img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .music-picker-item .info {
+      flex: 1;
+    }
+    .music-picker-item .info .title {
+      font-size: 15px;
+      color: #eee;
+    }
+    .music-picker-item .info .sub {
+      font-size: 12px;
+      color: #888;
+    }
+    .music-picker-item .check {
+      color: #2563eb;
+      font-size: 18px;
+      width: 24px;
+      text-align: center;
+    }
+    .music-picker-item .check.hidden { visibility: hidden; }
+
+    /* ===== DIALOGO DE DESCARGA (carrusel horizontal) ===== */
+    .download-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.85);
+      z-index: 3000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      backdrop-filter: blur(6px);
+    }
+    .download-overlay.active { display: flex; }
+    .download-panel {
+      background: #1a1a1a;
+      border-radius: 24px;
+      max-width: 500px;
+      width: 100%;
+      max-height: 80vh;
+      padding: 24px 20px 20px;
+      color: #eee;
+      overflow: hidden;
+      animation: slideUp 0.3s ease;
+      display: flex;
+      flex-direction: column;
+    }
+    .download-panel h3 {
+      font-size: 20px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    .download-panel .image-scroll {
+      display: flex;
+      overflow-x: auto;
+      overflow-y: hidden;
+      gap: 12px;
+      padding: 8px 4px 16px 4px;
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+      flex: 1;
+      min-height: 150px;
+      max-height: 55vh;
+    }
+    .download-panel .image-scroll::-webkit-scrollbar {
+      height: 4px;
+    }
+    .download-panel .image-scroll::-webkit-scrollbar-thumb {
+      background: #444;
+      border-radius: 4px;
+    }
+    .download-panel .image-scroll::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .download-panel .image-item {
+      flex: 0 0 180px;
+      scroll-snap-align: start;
+      background: #2a2a2a;
+      border-radius: 16px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      transition: 0.2s;
+      border: 2px solid transparent;
+    }
+    .download-panel .image-item:hover { background: #333; }
+    .download-panel .image-item.selected {
+      border-color: #2563eb;
+      background: #1e2a3a;
+    }
+    .download-panel .image-item input[type="checkbox"] {
+      width: 20px;
+      height: 20px;
+      accent-color: #2563eb;
+      cursor: pointer;
+      flex-shrink: 0;
+      order: 2;
+    }
+    .download-panel .image-item .thumb {
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      border-radius: 10px;
+      background-size: cover;
+      background-position: center;
+      background-color: #111;
+      flex-shrink: 0;
+      order: 1;
+    }
+    .download-panel .image-item .label {
+      font-size: 12px;
+      color: #aaa;
+      text-align: center;
+      order: 3;
+    }
+    .download-panel .actions {
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+      margin-top: 16px;
+      flex-shrink: 0;
+      padding-top: 12px;
+      border-top: 1px solid #333;
+    }
+    .download-panel .actions button {
+      padding: 10px 24px;
+      border: none;
+      border-radius: 30px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    .download-panel .actions .btn-download {
+      background: #2563eb;
+      color: #fff;
+    }
+    .download-panel .actions .btn-download:hover { background: #1d4ed8; transform: scale(1.02); }
+    .download-panel .actions .btn-cancel {
+      background: #333;
+      color: #eee;
+    }
+    .download-panel .actions .btn-cancel:hover { background: #444; }
+
     /* ===== LOGIN / REGISTER ===== */
     .login-view {
       flex: 1;
@@ -826,12 +1034,13 @@
     .create-field select { appearance: auto; background: #1a1a1a; color: #eee; }
     .create-field select option { background: #1a1a1a; color: #eee; }
 
-    /* ===== MUSIC PLAYER ===== */
+    /* ===== MUSIC PLAYER (en creación) ===== */
     .music-player-wrapper {
       display: flex;
       align-items: center;
       gap: 10px;
       margin-top: 4px;
+      flex-wrap: wrap;
     }
     .music-player-wrapper .play-btn {
       background: #2563eb;
@@ -851,6 +1060,52 @@
     .music-player-wrapper .play-btn:hover { transform: scale(1.05); background: #1d4ed8; }
     .music-player-wrapper .play-btn.playing { background: #ef4444; }
     .music-player-wrapper .play-btn.playing:hover { background: #dc2626; }
+
+    .music-select-btn {
+      flex: 1;
+      background: #2a2a2a;
+      border: 1px solid #444;
+      border-radius: 30px;
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      transition: 0.2s;
+      min-width: 0;
+      color: #eee;
+    }
+    .music-select-btn:hover { background: #333; border-color: #2563eb; }
+    .music-select-btn .cover {
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      background: #444;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      color: #aaa;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+    .music-select-btn .cover img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .music-select-btn .info {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 14px;
+    }
+    .music-select-btn .arrow {
+      color: #888;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
 
     /* ===== CREATE POST - GRID DE IMÁGENES (2 columnas) ===== */
     .create-images-grid {
@@ -998,7 +1253,6 @@
       body.top-bar-hidden .post-card { height: calc(100dvh - 70px); }
       .post-bottom-left { bottom: 12px; left: 12px; right: 70px; max-width: 75%; }
       .post-description { font-size: 14px; max-height: 30vh; }
-      .post-music-tag { bottom: 50px; left: 12px; font-size: 12px; padding: 3px 12px; max-width: 75%; }
       .post-actions-right { right: 6px; bottom: 90px; gap: 14px; }
       .post-actions-right .action-btn i { font-size: 24px; }
       .post-actions-right .action-btn span { font-size: 11px; }
@@ -1009,21 +1263,24 @@
       .edit-header h2, .create-header h2 { font-size: 18px; }
       .edit-header .save-btn, .create-header .publish-btn { font-size: 13px; padding: 6px 16px; }
       .profile-stats { max-width: 240px; }
-      .comments-panel { padding: 16px 16px 12px 16px; max-height: 80vh; }
+      .comments-panel, .music-picker-panel { padding: 16px 16px 12px 16px; max-height: 80vh; }
       .login-view h1 { font-size: 24px; }
       .profile-actions { flex-direction: row; gap: 8px; margin-top: 2px; }
       .edit-profile-btn, .logout-btn, .follow-btn { padding: 8px 16px; font-size: 13px; }
+      .download-panel .image-item { flex: 0 0 140px; }
+      .download-panel { padding: 16px; }
+      .music-select-btn .info { font-size: 13px; }
     }
     @media (max-width: 360px) {
       .post-bottom-left { right: 60px; max-width: 70%; bottom: 10px; }
       .post-description { font-size: 13px; }
-      .post-music-tag { bottom: 45px; font-size: 11px; padding: 2px 10px; }
       .post-actions-right { right: 4px; gap: 12px; bottom: 80px; }
       .post-actions-right .action-btn i { font-size: 20px; }
       .post-actions-right .action-btn span { font-size: 10px; }
       .post-profile-avatar { width: 34px; height: 34px; font-size: 14px; }
       .profile-actions { flex-direction: column; align-items: center; }
       .edit-profile-btn, .logout-btn, .follow-btn { width: 100%; justify-content: center; }
+      .music-select-btn .cover { width: 28px; height: 28px; }
     }
   </style>
 </head>
@@ -1058,6 +1315,7 @@
 
   <audio id="globalAudio" preload="auto" style="display:none;"></audio>
 
+  <!-- Comentarios -->
   <div class="comments-overlay" id="commentsOverlay">
     <div class="comments-panel">
       <div class="panel-header">
@@ -1070,6 +1328,31 @@
       <div class="comments-input-area">
         <input type="text" id="commentInput" placeholder="Escribe un comentario..." />
         <button class="send-btn" id="sendCommentBtn"><i class="fas fa-paper-plane"></i></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Selector de música (panel inferior) -->
+  <div class="music-picker-overlay" id="musicPickerOverlay">
+    <div class="music-picker-panel">
+      <div class="panel-header">
+        <h3><i class="fas fa-music"></i> Seleccionar música</h3>
+        <button class="close-btn" id="closeMusicPickerBtn"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="music-picker-list" id="musicPickerList">
+        <!-- Se llena dinámicamente -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Diálogo de descarga de imágenes -->
+  <div class="download-overlay" id="downloadOverlay">
+    <div class="download-panel" id="downloadPanel">
+      <h3><i class="fas fa-download"></i> Descargar imágenes</h3>
+      <div class="image-scroll" id="downloadImageScroll"></div>
+      <div class="actions">
+        <button class="btn-cancel" id="downloadCancelBtn">Cancelar</button>
+        <button class="btn-download" id="downloadConfirmBtn">Descargar seleccionadas</button>
       </div>
     </div>
   </div>
@@ -1120,8 +1403,11 @@
     let currentCommentPostId = null;
     let isUpdatingLike = false;
 
-    // Orden aleatorio de posts (array de ids)
+    // Orden aleatorio de posts
     let postOrder = [];
+
+    // Control de reproducción automática
+    let autoPlayAttempted = false;
 
     const MUSIC_JSON_URL = 'https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Data.json';
 
@@ -1140,6 +1426,18 @@
     const sendCommentBtn = document.getElementById('sendCommentBtn');
     const closeCommentsBtn = document.getElementById('closeCommentsBtn');
 
+    // Elementos del selector de música
+    const musicPickerOverlay = document.getElementById('musicPickerOverlay');
+    const musicPickerList = document.getElementById('musicPickerList');
+    const closeMusicPickerBtn = document.getElementById('closeMusicPickerBtn');
+
+    // Elementos del diálogo de descarga
+    const downloadOverlay = document.getElementById('downloadOverlay');
+    const downloadPanel = document.getElementById('downloadPanel');
+    const downloadImageScroll = document.getElementById('downloadImageScroll');
+    const downloadConfirmBtn = document.getElementById('downloadConfirmBtn');
+    const downloadCancelBtn = document.getElementById('downloadCancelBtn');
+
     // ============================================================
     //  FUNCIONES DE ALEATORIEDAD Y ORDEN
     // ============================================================
@@ -1156,7 +1454,6 @@
     }
 
     function insertNewPostInOrder(newPostId) {
-      // Insertar en posición aleatoria
       const pos = Math.floor(Math.random() * (postOrder.length + 1));
       postOrder.splice(pos, 0, newPostId);
     }
@@ -1167,7 +1464,6 @@
     function stopAllMusic() {
       globalAudio.pause();
       if (currentFeedAudioPostId !== null) {
-        updateFeedMusicButtons(currentFeedAudioPostId, false);
         currentFeedAudioPostId = null;
       }
       isPlaying = false;
@@ -1397,13 +1693,11 @@
             id: key,
             ...data[key]
           }));
-          // No ordenamos por timestamp, usamos postOrder
           posts = postsArray;
         } else {
           posts = [];
         }
 
-        // Actualizar liked status
         if (profileData.likedPosts && profileData.likedPosts.length > 0) {
           posts.forEach(post => {
             post.liked = profileData.likedPosts.includes(post.id);
@@ -1412,20 +1706,15 @@
           posts.forEach(post => post.liked = false);
         }
 
-        // Construir o actualizar el orden aleatorio
         const currentIds = posts.map(p => p.id);
         if (postOrder.length === 0) {
-          // Primera vez: crear orden aleatorio con todos los ids
           postOrder = buildRandomOrder(currentIds);
         } else {
-          // Eliminar ids que ya no existen
           postOrder = postOrder.filter(id => currentIds.includes(id));
-          // Añadir nuevos ids que no estén en el orden
           const newIds = currentIds.filter(id => !postOrder.includes(id));
           newIds.forEach(id => insertNewPostInOrder(id));
         }
 
-        // Ordenar posts según postOrder
         posts.sort((a, b) => {
           const indexA = postOrder.indexOf(a.id);
           const indexB = postOrder.indexOf(b.id);
@@ -1449,7 +1738,6 @@
       });
     }
 
-    // Sincroniza la UI del feed sin re-renderizar todo
     function syncFeedUI() {
       const container = document.getElementById('feedContainer');
       if (!container) return;
@@ -1465,13 +1753,10 @@
         }
       });
 
-      // Añadir nuevas publicaciones en el orden correcto (postOrder)
       const newPosts = posts.filter(p => !existingIds.has(p.id));
       if (newPosts.length > 0) {
-        // Insertar en el orden según postOrder
         newPosts.forEach(post => {
           const card = createPostCard(post);
-          // Buscar la posición correcta según postOrder
           const idx = postOrder.indexOf(post.id);
           let inserted = false;
           const children = container.children;
@@ -1491,6 +1776,7 @@
           }
         });
         setupFeedAutoPlay();
+        tryAutoPlayFirstMusic();
       }
     }
 
@@ -1516,13 +1802,6 @@
         descHtml = descHtml.replace(/#(\w+)/g, '<span class="hashtag">#$1</span>');
         descDiv.innerHTML = descHtml;
       }
-      const musicTag = card.querySelector('.post-music-tag');
-      if (musicTag) {
-        const musicUrl = post.musicUrl || '';
-        musicTag.dataset.musicUrl = musicUrl;
-        const span = musicTag.querySelector('span');
-        if (span) span.textContent = post.musicTitle || 'Música';
-      }
       const avatarDiv = card.querySelector('.post-profile-avatar');
       if (avatarDiv) {
         let displayAvatar = post.authorAvatar || null;
@@ -1540,6 +1819,140 @@
       }
     }
 
+    // ---- Toggle música al tocar el carrusel ----
+    function toggleMusicPlayback() {
+      if (!globalAudio.src) return;
+      if (globalAudio.paused) {
+        globalAudio.play().then(() => {
+          isPlaying = true;
+          if (!currentFeedAudioPostId) {
+            const post = posts.find(p => p.musicUrl === globalAudio.src);
+            if (post) currentFeedAudioPostId = post.id;
+          }
+        }).catch(err => {
+          console.warn('No se pudo reanudar la música:', err);
+        });
+      } else {
+        globalAudio.pause();
+        isPlaying = false;
+      }
+    }
+
+    // ============================================================
+    //  MANEJO DE LONG PRESS PARA DESCARGAR IMÁGENES
+    // ============================================================
+    function showDownloadDialog(postId) {
+      const post = posts.find(p => p.id === postId);
+      if (!post) return;
+
+      let images = [];
+      if (post.images && Array.isArray(post.images) && post.images.length > 0) {
+        images = post.images;
+      } else if (post.imageUrl) {
+        images = [post.imageUrl];
+      } else {
+        return;
+      }
+
+      downloadImageScroll.innerHTML = '';
+      images.forEach((url, index) => {
+        const item = document.createElement('div');
+        item.className = 'image-item selected';
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = true;
+        checkbox.dataset.index = index;
+        const thumb = document.createElement('div');
+        thumb.className = 'thumb';
+        thumb.style.backgroundImage = `url('${url}')`;
+        const label = document.createElement('span');
+        label.className = 'label';
+        label.textContent = `#${index + 1}`;
+        item.appendChild(checkbox);
+        item.appendChild(thumb);
+        item.appendChild(label);
+        item.addEventListener('click', function(e) {
+          if (e.target.tagName !== 'INPUT') {
+            const cb = this.querySelector('input[type="checkbox"]');
+            cb.checked = !cb.checked;
+            this.classList.toggle('selected', cb.checked);
+          } else {
+            this.classList.toggle('selected', e.target.checked);
+          }
+        });
+        checkbox.addEventListener('change', function(e) {
+          item.classList.toggle('selected', this.checked);
+        });
+        downloadImageScroll.appendChild(item);
+      });
+
+      downloadOverlay.classList.add('active');
+      downloadConfirmBtn.dataset.postId = postId;
+      downloadImageScroll.scrollLeft = 0;
+    }
+
+    function closeDownloadDialog() {
+      downloadOverlay.classList.remove('active');
+    }
+
+    async function downloadSelectedImages() {
+      const items = downloadImageScroll.querySelectorAll('.image-item');
+      const selected = [];
+      items.forEach(item => {
+        const cb = item.querySelector('input[type="checkbox"]');
+        if (cb && cb.checked) {
+          const idx = parseInt(cb.dataset.index, 10);
+          selected.push(idx);
+        }
+      });
+
+      if (selected.length === 0) {
+        alert('No has seleccionado ninguna imagen.');
+        return;
+      }
+
+      const postId = downloadConfirmBtn.dataset.postId;
+      const post = posts.find(p => p.id === postId);
+      if (!post) return;
+
+      let images = [];
+      if (post.images && Array.isArray(post.images) && post.images.length > 0) {
+        images = post.images;
+      } else if (post.imageUrl) {
+        images = [post.imageUrl];
+      }
+
+      const urlsToDownload = selected.map(idx => images[idx]).filter(Boolean);
+      if (urlsToDownload.length === 0) {
+        alert('No se seleccionaron imágenes válidas.');
+        return;
+      }
+
+      for (let i = 0; i < urlsToDownload.length; i++) {
+        const url = urlsToDownload[i];
+        try {
+          const response = await fetch(url);
+          const blob = await response.blob();
+          const link = document.createElement('a');
+          link.href = URL.createObjectURL(blob);
+          const ext = blob.type.split('/')[1] || 'jpg';
+          link.download = `imagen_${i+1}.${ext}`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          await new Promise(r => setTimeout(r, 100));
+        } catch (err) {
+          console.warn('Error al descargar imagen:', err);
+          alert(`Error al descargar la imagen ${i+1}.`);
+        }
+      }
+
+      closeDownloadDialog();
+    }
+
+    // ============================================================
+    //  CREAR POST CARD
+    // ============================================================
     function createPostCard(post) {
       const postCard = document.createElement('div');
       postCard.className = 'post-card';
@@ -1570,6 +1983,41 @@
         });
       }
       postCard.appendChild(carousel);
+
+      carousel.addEventListener('click', function(e) {
+        e.stopPropagation();
+        toggleMusicPlayback();
+      });
+
+      let pressTimer = null;
+      const startPress = function(e) {
+        pressTimer = setTimeout(() => {
+          const postId = this.closest('.post-card').dataset.postId;
+          showDownloadDialog(postId);
+        }, 500);
+      };
+      const endPress = function(e) {
+        clearTimeout(pressTimer);
+      };
+      const cancelPress = function(e) {
+        clearTimeout(pressTimer);
+      };
+      carousel.addEventListener('touchstart', startPress, { passive: true });
+      carousel.addEventListener('touchend', endPress, { passive: true });
+      carousel.addEventListener('touchcancel', cancelPress, { passive: true });
+      carousel.addEventListener('mousedown', function(e) {
+        if (e.button === 0) {
+          startPress.call(this, e);
+        }
+      });
+      carousel.addEventListener('mouseup', function(e) {
+        if (e.button === 0) {
+          endPress.call(this, e);
+        }
+      });
+      carousel.addEventListener('mouseleave', function(e) {
+        cancelPress.call(this, e);
+      });
 
       if (images.length > 1) {
         const counter = document.createElement('div');
@@ -1610,17 +2058,6 @@
       let descHtml = post.description || 'Sin descripción';
       descHtml = descHtml.replace(/#(\w+)/g, '<span class="hashtag">#$1</span>');
 
-      let musicHtml = '';
-      if (post.musicUrl) {
-        musicHtml = `
-          <div class="post-music-tag" data-post-id="${post.id}" data-music-url="${post.musicUrl}">
-            <i class="fas fa-music"></i>
-            <span>${post.musicTitle || 'Música'}</span>
-            <button class="play-btn-small"><i class="fas fa-play"></i></button>
-          </div>
-        `;
-      }
-
       const bottomLeft = document.createElement('div');
       bottomLeft.className = 'post-bottom-left';
       bottomLeft.innerHTML = `<div class="post-description">${descHtml}</div>`;
@@ -1640,11 +2077,6 @@
       `;
 
       postCard.appendChild(bottomLeft);
-      if (musicHtml) {
-        const musicDiv = document.createElement('div');
-        musicDiv.innerHTML = musicHtml;
-        postCard.appendChild(musicDiv.firstElementChild);
-      }
       postCard.appendChild(actionsRight);
 
       const avatarDiv = postCard.querySelector('.post-profile-avatar');
@@ -1675,26 +2107,13 @@
           openComments(postId);
         });
       }
-      const musicTag = postCard.querySelector('.post-music-tag');
-      if (musicTag) {
-        const playBtn = musicTag.querySelector('.play-btn-small');
-        const postId = musicTag.dataset.postId;
-        const musicUrl = musicTag.dataset.musicUrl;
-        if (playBtn && musicUrl) {
-          playBtn.addEventListener('click', function(e) {
-            e.stopPropagation();
-            toggleFeedMusic(postId, musicUrl);
-          });
-          musicTag.addEventListener('click', function(e) {
-            if (e.target.closest('.play-btn-small')) return;
-            toggleFeedMusic(postId, musicUrl);
-          });
-        }
-      }
 
       return postCard;
     }
 
+    // ============================================================
+    //  RESTO DE FUNCIONES (savePost, updatePost, etc.)
+    // ============================================================
     function savePostToFirebase(postData) {
       const postsRef = database.ref('posts');
       const newPostRef = postsRef.push();
@@ -1807,7 +2226,8 @@
         if (Array.isArray(data) && data.length > 0) {
           musicList = data.map(item => ({
             value: item.file,
-            label: `🎵 ${item.title}`
+            label: item.title || 'Sin título',
+            icon: item.icon || item.iconUrl || item.image || item.cover || item.thumbnail || ''
           }));
         } else {
           throw new Error('Formato de datos inválido');
@@ -1815,93 +2235,182 @@
       } catch (error) {
         console.warn('Error al cargar música desde GitHub, usando lista por defecto:', error);
         musicList = [
-          { value: '', label: 'Sin música' },
-          { value: 'https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Musica/MONTAGEM.mp3', label: '🎵 MONTAGEM' },
-          { value: 'https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Musica/NOOTFUNK.mp3', label: '🎵 NOOTFUNK' },
+          { value: '', label: 'Sin música', icon: '' },
+          {
+            value: 'https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Musica/MONTAGEM.mp3',
+            label: 'MONTAGEM',
+            icon: 'https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Icono/MONTAGEM.png'
+          },
+          {
+            value: 'https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Musica/NOOTFUNK.mp3',
+            label: 'NOOTFUNK',
+            icon: 'https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Icono/NOOTFUNK.png'
+          },
         ];
       }
-      updateMusicSelect();
+      // Actualizar el selector de música (botón y lista)
+      updateMusicPicker();
     }
 
-    function updateMusicSelect() {
-      const select = document.getElementById('createMusicSelect');
-      if (!select) return;
-      const currentValue = select.value;
-      select.innerHTML = '';
-      musicList.forEach(opt => {
-        const option = document.createElement('option');
-        option.value = opt.value;
-        option.textContent = opt.label;
-        select.appendChild(option);
-      });
-      if (currentValue) {
-        select.value = currentValue;
+    // Función para obtener un color a partir de un string (para el cover)
+    function stringToColor(str) {
+      let hash = 0;
+      for (let i = 0; i < str.length; i++) {
+        hash = str.charCodeAt(i) + ((hash << 5) - hash);
       }
-      const playBtn = document.getElementById('musicPlayBtn');
-      if (playBtn) {
-        playBtn.classList.remove('playing');
-        playBtn.innerHTML = '<i class="fas fa-play"></i>';
-      }
-      isPlaying = false;
+      const hue = Math.abs(hash) % 360;
+      return `hsl(${hue}, 70%, 50%)`;
     }
 
-    function toggleCreatePlay() {
-      const select = document.getElementById('createMusicSelect');
-      const url = select.value;
-      const playBtn = document.getElementById('musicPlayBtn');
-      if (!url) {
-        stopAllMusic();
+    function getMusicIconCandidates(item) {
+      const candidates = [];
+      const add = (value) => {
+        if (value && !candidates.includes(value)) candidates.push(value);
+      };
+
+      add(item && item.icon);
+      add(item && item.iconUrl);
+      add(item && item.image);
+      add(item && item.cover);
+      add(item && item.thumbnail);
+
+      const fileName = (item && item.file ? String(item.file) : '').split('/').pop().split('?')[0];
+      if (fileName) {
+        const base = fileName.replace(/\.[^.]+$/, '');
+        const encodedBase = encodeURIComponent(base);
+        const rawRoot = 'https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Icono/';
+        ['png', 'jpg', 'jpeg', 'webp'].forEach(ext => add(`${rawRoot}${encodedBase}.${ext}`));
+        ['png', 'jpg', 'jpeg', 'webp'].forEach(ext => add(`Icono/${encodedBase}.${ext}`));
+      }
+
+      return candidates;
+    }
+
+    function renderMusicCover(coverEl, item, fallbackHtml) {
+      if (!coverEl) return;
+
+      const label = item && item.label ? item.label : 'Sin música';
+      const color = label !== 'Sin música' ? stringToColor(label) : '#444';
+      const candidates = getMusicIconCandidates(item);
+
+      coverEl.style.background = color;
+
+      if (!candidates.length) {
+        coverEl.innerHTML = fallbackHtml;
         return;
       }
-      if (isPlaying && globalAudio.src === url && !globalAudio.paused) {
-        stopAllMusic();
-      } else {
-        stopAllMusic();
-        playCreateMusic(url);
-      }
+
+      const img = document.createElement('img');
+      let index = 0;
+
+      const tryNext = () => {
+        if (index >= candidates.length) {
+          coverEl.innerHTML = fallbackHtml;
+          coverEl.style.background = color;
+          return;
+        }
+        img.src = candidates[index++];
+      };
+
+      img.onerror = tryNext;
+      img.onload = () => {
+        coverEl.innerHTML = '';
+        coverEl.appendChild(img);
+      };
+
+      tryNext();
     }
 
-    function playCreateMusic(url) {
-      if (globalAudio.src !== url) {
-        globalAudio.src = url;
-        globalAudio.load();
+    // Actualiza el botón de selección de música y la lista del picker
+    function updateMusicPicker() {
+      const selectBtn = document.getElementById('musicSelectBtn');
+      const list = document.getElementById('musicPickerList');
+      if (!selectBtn || !list) return;
+
+      // Guardar selección actual
+      const currentValue = selectBtn.dataset.value || '';
+
+      // Actualizar botón
+      const selected = musicList.find(m => m.value === currentValue) || musicList[0] || { value: '', label: 'Sin música', icon: '' };
+      const coverDiv = selectBtn.querySelector('.cover');
+      const infoSpan = selectBtn.querySelector('.info');
+      if (coverDiv) {
+        renderMusicCover(coverDiv, selected, '<i class="fas fa-music"></i>');
       }
-      const playFn = () => {
-        globalAudio.play().then(() => {
-          isPlaying = true;
-          const playBtn = document.getElementById('musicPlayBtn');
-          if (playBtn) {
-            playBtn.innerHTML = '<i class="fas fa-pause"></i>';
-            playBtn.classList.add('playing');
+      if (infoSpan) {
+        infoSpan.textContent = selected.label || 'Sin música';
+      }
+
+      // Actualizar lista del picker
+      list.innerHTML = '';
+      musicList.forEach((item, index) => {
+        const div = document.createElement('div');
+        div.className = 'music-picker-item';
+        if (item.value === currentValue) {
+          div.style.background = '#2a2a2a';
+        }
+        const cover = document.createElement('div');
+        cover.className = 'cover';
+        renderMusicCover(cover, item, '🎵');
+
+        const info = document.createElement('div');
+        info.className = 'info';
+        info.innerHTML = `<div class="title">${item.label || 'Sin música'}</div><div class="sub">${item.value ? 'Canción' : 'Sin audio'}</div>`;
+
+        const check = document.createElement('div');
+        check.className = 'check' + (item.value === currentValue ? '' : ' hidden');
+        check.innerHTML = '<i class="fas fa-check-circle"></i>';
+
+        div.appendChild(cover);
+        div.appendChild(info);
+        div.appendChild(check);
+
+        div.addEventListener('click', function() {
+          // Actualizar selección
+          selectBtn.dataset.value = item.value;
+          // Cerrar picker
+          closeMusicPicker();
+          // Actualizar el botón
+          updateMusicPicker();
+          // Cambiar el audio si se seleccionó una canción
+          if (item.value) {
+            globalAudio.src = item.value;
+            globalAudio.load();
+            // Si estaba sonando, reiniciar
+            if (isPlaying) {
+              globalAudio.play().catch(() => {});
+            }
+          } else {
+            stopAllMusic();
           }
-        }).catch(err => {
-          console.warn('Error al reproducir en creación:', err);
-          isPlaying = false;
+          // Actualizar el botón de play en creación
           const playBtn = document.getElementById('musicPlayBtn');
           if (playBtn) {
             playBtn.innerHTML = '<i class="fas fa-play"></i>';
             playBtn.classList.remove('playing');
           }
         });
-      };
-      if (globalAudio.readyState >= 2) {
-        playFn();
-      } else {
-        globalAudio.addEventListener('canplaythrough', playFn, { once: true });
-        setTimeout(() => {
-          if (!isPlaying) {
-            globalAudio.removeEventListener('canplaythrough', playFn);
-            playFn();
-          }
-        }, 3000);
-      }
+
+        list.appendChild(div);
+      });
     }
 
-    // ------------------------------------------------------------
+    function openMusicPicker() {
+      musicPickerOverlay.classList.add('active');
+      // Actualizar lista para reflejar selección actual
+      updateMusicPicker();
+    }
+
+    function closeMusicPicker() {
+      musicPickerOverlay.classList.remove('active');
+    }
+
+    // ============================================================
     //  FEED MUSIC PLAYER
-    // ------------------------------------------------------------
+    // ============================================================
     function playFeedMusic(postId, url) {
       if (!url) return;
+      if (globalAudio.src === url && !globalAudio.paused) return;
       stopAllMusic();
       if (globalAudio.src !== url) {
         globalAudio.src = url;
@@ -1913,11 +2422,11 @@
       const playFn = () => {
         globalAudio.play().then(() => {
           currentFeedAudioPostId = postId;
-          updateFeedMusicButtons(postId, true);
+          isPlaying = true;
         }).catch(err => {
           console.warn('Error al reproducir en feed:', err);
           currentFeedAudioPostId = null;
-          updateFeedMusicButtons(postId, false);
+          isPlaying = false;
         });
       };
 
@@ -1934,27 +2443,28 @@
       }
     }
 
-    function toggleFeedMusic(postId, url) {
-      if (currentFeedAudioPostId === postId && !globalAudio.paused) {
-        stopAllMusic();
-      } else {
-        playFeedMusic(postId, url);
+    function tryAutoPlayFirstMusic() {
+      if (autoPlayAttempted) return;
+      if (posts.length === 0) return;
+      const firstWithMusic = posts.find(p => p.musicUrl);
+      if (firstWithMusic) {
+        autoPlayAttempted = true;
+        playFeedMusic(firstWithMusic.id, firstWithMusic.musicUrl);
+        const playOnInteraction = function() {
+          if (!isPlaying && globalAudio.src) {
+            globalAudio.play().then(() => {
+              isPlaying = true;
+              if (firstWithMusic) currentFeedAudioPostId = firstWithMusic.id;
+            }).catch(() => {});
+          }
+          document.removeEventListener('click', playOnInteraction);
+          document.removeEventListener('touchstart', playOnInteraction);
+        };
+        document.addEventListener('click', playOnInteraction, { once: true });
+        document.addEventListener('touchstart', playOnInteraction, { once: true });
       }
     }
 
-    function updateFeedMusicButtons(postId, isPlayingNow) {
-      document.querySelectorAll('.post-card').forEach(card => {
-        const id = card.dataset.postId;
-        const btn = card.querySelector('.play-btn-small');
-        if (id === postId && btn) {
-          btn.innerHTML = isPlayingNow ? '<i class="fas fa-pause"></i>' : '<i class="fas fa-play"></i>';
-        } else if (btn) {
-          btn.innerHTML = '<i class="fas fa-play"></i>';
-        }
-      });
-    }
-
-    // ---- FEED AUTO PLAY ----
     function setupFeedAutoPlay() {
       if (feedObserver) {
         feedObserver.disconnect();
@@ -1979,7 +2489,21 @@
               playFeedMusic(postId, post.musicUrl);
             }
           } else {
-            stopAllMusic();
+            const visibleCards = container.querySelectorAll('.post-card');
+            let nextWithMusic = null;
+            for (let card of visibleCards) {
+              const id = card.dataset.postId;
+              const p = posts.find(po => po.id === id);
+              if (p && p.musicUrl) {
+                nextWithMusic = p;
+                break;
+              }
+            }
+            if (nextWithMusic && nextWithMusic.id !== currentFeedAudioPostId) {
+              playFeedMusic(nextWithMusic.id, nextWithMusic.musicUrl);
+            } else if (!nextWithMusic) {
+              stopAllMusic();
+            }
           }
         } else {
           stopAllMusic();
@@ -2034,6 +2558,7 @@
 
       setTimeout(() => {
         setupFeedAutoPlay();
+        tryAutoPlayFirstMusic();
         const firstCard = container.querySelector('.post-card');
         if (firstCard) {
           firstCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -2041,12 +2566,10 @@
       }, 150);
     }
 
-    // ---- FUNCIÓN PARA NAVEGAR A UNA PUBLICACIÓN DESDE EL PERFIL ----
+    // ---- NAVEGAR A POST ----
     function goToPost(postId) {
-      // Primero nos aseguramos de estar en el feed
       const feedContainer = document.getElementById('feedContainer');
       if (!feedContainer) {
-        // Si no hay feed, mostrar home y luego desplazar
         showHome();
         setTimeout(() => {
           const cards = document.querySelectorAll('.post-card');
@@ -2057,7 +2580,6 @@
           if (target) {
             target.scrollIntoView({ behavior: 'smooth', block: 'start' });
           } else {
-            // Si no se encuentra, recargar feed y buscar de nuevo
             renderFeed();
             setTimeout(() => {
               const cards2 = document.querySelectorAll('.post-card');
@@ -2072,7 +2594,6 @@
           }
         }, 300);
       } else {
-        // Ya estamos en el feed, buscar y desplazar
         const cards = document.querySelectorAll('.post-card');
         let target = null;
         cards.forEach(c => {
@@ -2081,7 +2602,6 @@
         if (target) {
           target.scrollIntoView({ behavior: 'smooth', block: 'start' });
         } else {
-          // Si no está visible, recargar feed
           renderFeed();
           setTimeout(() => {
             const cards2 = document.querySelectorAll('.post-card');
@@ -2097,7 +2617,7 @@
       }
     }
 
-    // ---- ACTUALIZAR LIKE EN DOM ----
+    // ---- LIKES ----
     function updateLikeInDOM(postId, isLiked, newLikes) {
       const postCard = document.querySelector(`.post-card[data-post-id="${postId}"]`);
       if (!postCard) return;
@@ -2111,7 +2631,6 @@
       }
     }
 
-    // ---- LIKES ----
     function toggleLike(postId) {
       const post = posts.find(p => p.id === postId);
       if (!post) return;
@@ -2247,10 +2766,6 @@
           <button class="search-tab" data-tab="users">Usuarios</button>
         </div>
         <div class="search-results" id="searchResults">
-          <div class="search-empty">
-            <i class="fas fa-search"></i>
-            <p>Escribe una palabra para buscar</p>
-          </div>
         </div>
       `;
 
@@ -2260,37 +2775,143 @@
       const searchResults = document.getElementById('searchResults');
       const tabs = container.querySelectorAll('.search-tab');
 
+      function getRandomSuggestions(type) {
+        const results = [];
+        if (type === 'posts') {
+          const shuffled = shuffleArray([...posts]);
+          const sliced = shuffled.slice(0, 10);
+          sliced.forEach(post => {
+            let imgSrc = '';
+            if (post.images && post.images.length > 0) imgSrc = post.images[0];
+            else if (post.imageUrl) imgSrc = post.imageUrl;
+            results.push({
+              id: post.id,
+              image: imgSrc,
+              desc: post.description || 'Sin descripción',
+              music: post.musicTitle || ''
+            });
+          });
+        } else {
+          const userSet = new Map();
+          posts.forEach(post => {
+            if (post.authorUid && post.authorUid !== 'unknown') {
+              if (!userSet.has(post.authorUid)) {
+                userSet.set(post.authorUid, {
+                  uid: post.authorUid,
+                  name: post.authorName || 'Usuario',
+                  avatar: post.authorAvatar || null,
+                  bio: ''
+                });
+              }
+            }
+          });
+          const usersArray = Array.from(userSet.values());
+          const shuffled = shuffleArray(usersArray);
+          const sliced = shuffled.slice(0, 10);
+          sliced.forEach(user => {
+            results.push({
+              uid: user.uid,
+              name: user.name,
+              avatar: user.avatar,
+              bio: ''
+            });
+          });
+        }
+        return results;
+      }
+
+      function renderSearchResults(query) {
+        const tab = searchActiveTab;
+        const resultsContainer = document.getElementById('searchResults');
+        if (!resultsContainer) return;
+
+        if (query.length === 0) {
+          const suggestions = getRandomSuggestions(tab);
+          if (suggestions.length === 0) {
+            resultsContainer.innerHTML = `
+              <div class="search-empty">
+                <i class="fas fa-search"></i>
+                <p>No hay sugerencias disponibles</p>
+              </div>
+            `;
+            return;
+          }
+          let html = '';
+          if (tab === 'posts') {
+            suggestions.forEach(item => {
+              html += `
+                <div class="search-result-item" data-post-id="${item.id}">
+                  ${item.image ? `<img src="${item.image}" alt="Preview" />` : `<div style="width:60px;height:60px;border-radius:12px;background:#2a2a2a;display:flex;align-items:center;justify-content:center;color:#555;"><i class="fas fa-image"></i></div>`}
+                  <div class="info">
+                    <div class="desc">${item.desc.length > 60 ? item.desc.substring(0,60) + '...' : item.desc}</div>
+                    <div class="tags">${item.music ? '🎵 ' + item.music : ''}</div>
+                  </div>
+                </div>
+              `;
+            });
+          } else {
+            suggestions.forEach(item => {
+              const avatarHtml = item.avatar
+                ? `<img src="${item.avatar}" alt="Avatar" />`
+                : `<div style="width:60px;height:60px;border-radius:12px;background:#2a2a2a;display:flex;align-items:center;justify-content:center;color:#555;font-size:24px;"><i class="fas fa-user"></i></div>`;
+              html += `
+                <div class="search-result-item" data-uid="${item.uid}">
+                  ${avatarHtml}
+                  <div class="info">
+                    <div class="desc">${item.name}</div>
+                    <div class="tags">${item.bio || ''}</div>
+                  </div>
+                </div>
+              `;
+            });
+          }
+          resultsContainer.innerHTML = html;
+          resultsContainer.querySelectorAll('.search-result-item').forEach(el => {
+            if (el.dataset.postId) {
+              el.addEventListener('click', function() {
+                const postId = this.dataset.postId;
+                closeSearchAndGoToPost(postId);
+              });
+            } else if (el.dataset.uid) {
+              el.addEventListener('click', function() {
+                const uid = this.dataset.uid;
+                if (uid) {
+                  closeSearch();
+                  showUserProfile(uid);
+                }
+              });
+            }
+          });
+          return;
+        }
+
+        performSearch(query);
+      }
+
       tabs.forEach(tab => {
         tab.addEventListener('click', function() {
           tabs.forEach(t => t.classList.remove('active'));
           this.classList.add('active');
           searchActiveTab = this.dataset.tab;
-          performSearch(searchInput.value.trim());
+          renderSearchResults(searchInput.value.trim());
         });
       });
 
       searchInput.addEventListener('input', function() {
         searchQuery = this.value.trim();
-        performSearch(searchQuery);
+        renderSearchResults(searchQuery);
       });
 
       document.getElementById('searchBackBtn').addEventListener('click', closeSearch);
+
+      renderSearchResults('');
       setTimeout(() => searchInput.focus(), 100);
     }
 
     function performSearch(query) {
       const searchResults = document.getElementById('searchResults');
       if (!searchResults) return;
-
-      if (query.length === 0) {
-        searchResults.innerHTML = `
-          <div class="search-empty">
-            <i class="fas fa-search"></i>
-            <p>Escribe una palabra para buscar</p>
-          </div>
-        `;
-        return;
-      }
+      if (query.length === 0) return;
 
       if (searchActiveTab === 'posts') {
         const results = posts.filter(post => {
@@ -2441,7 +3062,7 @@
     }
 
     // ============================================================
-    //  CREAR POST (con imágenes precargadas)
+    //  CREAR POST
     // ============================================================
     function createPost(imagesData, description, musicUrl, musicTitle) {
       const loadingMsg = document.createElement('div');
@@ -2479,7 +3100,7 @@
         });
     }
 
-    // ---- VISTA CREAR POST (con GRID de imágenes) ----
+    // ---- VISTA CREAR POST ----
     function showCreatePost(preloadedImages = []) {
       stopAllMusic();
       closeComments();
@@ -2495,9 +3116,8 @@
       container.className = 'create-post-view active';
       container.id = 'createPostView';
 
-      let musicOptionsHtml = musicList.map(opt =>
-        `<option value="${opt.value}">${opt.label}</option>`
-      ).join('');
+      // Seleccionar la primera canción por defecto (o la que estaba)
+      const defaultMusic = musicList[0] || { value: '', label: 'Sin música' };
 
       container.innerHTML = `
         <div class="create-header">
@@ -2518,11 +3138,13 @@
           <textarea id="createDescInput" placeholder="Escribe una descripción..."></textarea>
         </div>
         <div class="create-field">
-          <label for="createMusicSelect">Música</label>
+          <label>Música</label>
           <div class="music-player-wrapper">
-            <select id="createMusicSelect">
-              ${musicOptionsHtml}
-            </select>
+            <button class="music-select-btn" id="musicSelectBtn" data-value="${defaultMusic.value}">
+              <div class="cover" style="background:#444;"><i class="fas fa-music"></i></div>
+              <span class="info">${defaultMusic.label}</span>
+              <span class="arrow"><i class="fas fa-chevron-down"></i></span>
+            </button>
             <button class="play-btn" id="musicPlayBtn"><i class="fas fa-play"></i></button>
           </div>
         </div>
@@ -2530,6 +3152,64 @@
 
       mainContent.appendChild(container);
 
+      // Inicializar el selector de música
+      updateMusicPicker();
+
+      // Evento para abrir el picker
+      document.getElementById('musicSelectBtn').addEventListener('click', function(e) {
+        e.stopPropagation();
+        openMusicPicker();
+      });
+
+      // Evento play/pause en creación
+      document.getElementById('musicPlayBtn').addEventListener('click', function() {
+        const selectBtn = document.getElementById('musicSelectBtn');
+        const url = selectBtn.dataset.value || '';
+        if (!url) {
+          alert('Selecciona una canción primero.');
+          return;
+        }
+        if (isPlaying && globalAudio.src === url && !globalAudio.paused) {
+          stopAllMusic();
+        } else {
+          stopAllMusic();
+          if (globalAudio.src !== url) {
+            globalAudio.src = url;
+            globalAudio.load();
+          }
+          const playFn = () => {
+            globalAudio.play().then(() => {
+              isPlaying = true;
+              const playBtn = document.getElementById('musicPlayBtn');
+              if (playBtn) {
+                playBtn.innerHTML = '<i class="fas fa-pause"></i>';
+                playBtn.classList.add('playing');
+              }
+            }).catch(err => {
+              console.warn('Error al reproducir en creación:', err);
+              isPlaying = false;
+              const playBtn = document.getElementById('musicPlayBtn');
+              if (playBtn) {
+                playBtn.innerHTML = '<i class="fas fa-play"></i>';
+                playBtn.classList.remove('playing');
+              }
+            });
+          };
+          if (globalAudio.readyState >= 2) {
+            playFn();
+          } else {
+            globalAudio.addEventListener('canplaythrough', playFn, { once: true });
+            setTimeout(() => {
+              if (!isPlaying) {
+                globalAudio.removeEventListener('canplaythrough', playFn);
+                playFn();
+              }
+            }, 3000);
+          }
+        }
+      });
+
+      // Grid de imágenes
       function updateImageGrid() {
         const grid = document.getElementById('createImagesGrid');
         if (!grid) return;
@@ -2595,35 +3275,18 @@
           return;
         }
         const description = document.getElementById('createDescInput').value.trim() || 'Sin descripción';
-        const musicSelect = document.getElementById('createMusicSelect');
-        const selectedOption = musicSelect.options[musicSelect.selectedIndex];
-        const musicUrl = musicSelect.value;
-        const musicTitle = selectedOption ? selectedOption.text.replace(/^🎵\s*/, '') : '';
+        const selectBtn = document.getElementById('musicSelectBtn');
+        const musicUrl = selectBtn.dataset.value || '';
+        const selectedMusic = musicList.find(m => m.value === musicUrl);
+        const musicTitle = selectedMusic ? selectedMusic.label : '';
         createPost(selectedImagesData, description, musicUrl, musicTitle);
         stopAllMusic();
       });
 
-      const musicSelect = document.getElementById('createMusicSelect');
-      const playBtn = document.getElementById('musicPlayBtn');
-
-      musicSelect.addEventListener('change', function() {
-        stopAllMusic();
-        const url = this.value;
-        if (url) {
-          globalAudio.src = url;
-          globalAudio.load();
-        }
-        playBtn.innerHTML = '<i class="fas fa-play"></i>';
-        playBtn.classList.remove('playing');
-        isPlaying = false;
-      });
-
-      playBtn.addEventListener('click', function() {
-        toggleCreatePlay();
-      });
-
-      if (musicSelect.value) {
-        globalAudio.src = musicSelect.value;
+      // Cargar la música por defecto
+      const defaultUrl = defaultMusic.value;
+      if (defaultUrl) {
+        globalAudio.src = defaultUrl;
         globalAudio.load();
       }
 
@@ -2702,7 +3365,6 @@
         </div>
       `;
 
-      // Evento click para cada post-item que navega a la publicación
       container.querySelectorAll('.post-item').forEach(item => {
         item.addEventListener('click', function() {
           const postId = this.dataset.postId;
@@ -2743,7 +3405,7 @@
       return container;
     }
 
-    // ---- MOSTRAR PERFIL DE UN USUARIO ----
+    // ---- MOSTRAR PERFIL ----
     function showUserProfile(uid) {
       stopAllMusic();
       closeComments();
@@ -2767,7 +3429,6 @@
       }
     }
 
-    // ---- MOSTRAR PERFIL ACTUAL ----
     function showProfile(uid) {
       if (!uid) uid = currentUserId;
       showUserProfile(uid);
@@ -2907,7 +3568,8 @@
         showHome();
       } else {
         currentUserId = null;
-        postOrder = []; // resetear orden
+        postOrder = [];
+        autoPlayAttempted = false;
         showLoginView();
         homeBtn.classList.remove('active');
         profileBtn.classList.remove('active');
@@ -2978,6 +3640,19 @@
         addComment();
       }
     });
+
+    // Eventos del selector de música
+    closeMusicPickerBtn.addEventListener('click', closeMusicPicker);
+    musicPickerOverlay.addEventListener('click', function(e) {
+      if (e.target === this) closeMusicPicker();
+    });
+
+    // Eventos del diálogo de descarga
+    downloadCancelBtn.addEventListener('click', closeDownloadDialog);
+    downloadOverlay.addEventListener('click', function(e) {
+      if (e.target === this) closeDownloadDialog();
+    });
+    downloadConfirmBtn.addEventListener('click', downloadSelectedImages);
 
     loadMusicFromJson().catch(() => {});
   </script>
