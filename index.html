@@ -112,6 +112,7 @@
       -webkit-overflow-scrolling: touch;
       height: 100%;
       position: relative;
+      scroll-padding-top: 0px;
     }
     .feed-container {
       width: 100%;
@@ -129,7 +130,8 @@
       position: relative;
       width: 100%;
       height: calc(100dvh - 70px - 80px);
-      min-height: 500px;
+      min-height: unset;
+      max-height: calc(100dvh - 70px - 80px);
       background-color: #000;
       display: flex;
       flex-direction: column;
@@ -144,6 +146,7 @@
     }
     body.top-bar-hidden .post-card {
       height: calc(100dvh - 80px);
+      max-height: calc(100dvh - 80px);
     }
     .post-image-carousel {
       position: absolute;
@@ -570,6 +573,25 @@
       padding: 4px;
     }
     .music-picker-panel .panel-header .close-btn:hover { color: #fff; }
+    .music-search-input {
+      width: 100%;
+      padding: 10px 16px;
+      border: 1px solid #333;
+      border-radius: 30px;
+      font-size: 14px;
+      background: #111;
+      color: #eee;
+      margin-bottom: 12px;
+      outline: none;
+      transition: 0.2s;
+    }
+    .music-search-input:focus {
+      border-color: #3b82f6;
+      background: #1a1a1a;
+    }
+    .music-search-input::placeholder {
+      color: #777;
+    }
     .music-picker-list {
       flex: 1;
       overflow-y: auto;
@@ -657,6 +679,11 @@
     .music-picker-item .preview-btn i {
       font-size: 13px;
       margin-left: 1px;
+    }
+    .music-empty-message {
+      text-align: center;
+      color: #888;
+      padding: 20px;
     }
 
 
@@ -925,9 +952,39 @@
       background-size: cover;
       background-position: center;
       cursor: pointer;
+      position: relative;
+      overflow: hidden;
     }
     .profile-posts .post-item:hover { opacity: 0.8; transform: scale(1.02); }
     .profile-posts .post-item i { font-size: 24px; color: #555; }
+    .profile-posts .post-item .delete-post-btn {
+      position: absolute;
+      bottom: 4px;
+      right: 4px;
+      background: rgba(0,0,0,0.7);
+      color: #fff;
+      border: none;
+      border-radius: 50%;
+      width: 28px;
+      height: 28px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: 0.2s;
+      backdrop-filter: blur(4px);
+      z-index: 5;
+      pointer-events: auto;
+      font-size: 14px;
+    }
+    .profile-posts .post-item .delete-post-btn i {
+      font-size: 10px;
+      color: #fff;
+    }
+    .profile-posts .post-item .delete-post-btn:hover {
+      background: #ef4444;
+      transform: scale(1.1);
+    }
     .profile-actions {
       display: flex;
       flex-direction: row;
@@ -1289,6 +1346,70 @@
     .bottom-bar .nav-item.plus-btn:hover { transform: scale(1.05); background: #1d4ed8; }
     .bottom-bar .nav-item:not(.plus-btn):hover { color: #ccc; }
 
+    /* ===== DIALOGO DE CONFIRMACIÓN PARA ELIMINAR ===== */
+    .delete-confirm-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.8);
+      z-index: 4000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      backdrop-filter: blur(4px);
+    }
+    .delete-confirm-overlay.active { display: flex; }
+    .delete-confirm-panel {
+      background: #1a1a1a;
+      border-radius: 24px;
+      max-width: 360px;
+      width: 100%;
+      padding: 28px 24px 20px;
+      color: #eee;
+      text-align: center;
+      animation: slideUp 0.3s ease;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+    }
+    .delete-confirm-panel .icon {
+      font-size: 48px;
+      color: #ef4444;
+      margin-bottom: 8px;
+    }
+    .delete-confirm-panel .message {
+      font-size: 16px;
+      line-height: 1.5;
+      margin-bottom: 20px;
+      color: #ccc;
+    }
+    .delete-confirm-panel .actions {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+    }
+    .delete-confirm-panel .actions button {
+      padding: 10px 28px;
+      border: none;
+      border-radius: 40px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: 0.2s;
+      min-width: 100px;
+    }
+    .delete-confirm-panel .actions .btn-cancel {
+      background: #333;
+      color: #eee;
+    }
+    .delete-confirm-panel .actions .btn-cancel:hover { background: #444; }
+    .delete-confirm-panel .actions .btn-danger {
+      background: #ef4444;
+      color: #fff;
+    }
+    .delete-confirm-panel .actions .btn-danger:hover { background: #dc2626; transform: scale(1.02); }
+
     /* ===== RESPONSIVE ===== */
     @media (max-width: 420px) {
       body { padding-top: 60px; padding-bottom: 70px; }
@@ -1300,8 +1421,8 @@
       .bottom-bar .nav-item i { font-size: 20px; }
       .bottom-bar .nav-item.plus-btn { width: 46px; height: 46px; }
       .bottom-bar .nav-item.plus-btn i { font-size: 22px; }
-      .post-card { height: calc(100dvh - 60px - 70px); min-height: 400px; }
-      body.top-bar-hidden .post-card { height: calc(100dvh - 70px); }
+      .post-card { height: calc(100dvh - 60px - 70px); max-height: calc(100dvh - 60px - 70px); min-height: unset; }
+      body.top-bar-hidden .post-card { height: calc(100dvh - 70px); max-height: calc(100dvh - 70px); }
       .post-bottom-left { bottom: 12px; left: 12px; right: 70px; max-width: 75%; }
       .post-description { font-size: 14px; max-height: 30vh; }
       .post-actions-right { right: 6px; bottom: 90px; gap: 14px; }
@@ -1390,6 +1511,7 @@
         <h3><i class="fas fa-music"></i> Seleccionar música</h3>
         <button class="close-btn" id="closeMusicPickerBtn"><i class="fas fa-times"></i></button>
       </div>
+      <input type="text" class="music-search-input" id="musicSearchInput" placeholder="Buscar música..." />
       <div class="music-picker-list" id="musicPickerList">
         <!-- Se llena dinámicamente -->
       </div>
@@ -1404,6 +1526,18 @@
       <div class="actions">
         <button class="btn-cancel" id="downloadCancelBtn">Cancelar</button>
         <button class="btn-download" id="downloadConfirmBtn">Descargar seleccionadas</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Diálogo de confirmación para eliminar publicación -->
+  <div class="delete-confirm-overlay" id="deleteConfirmOverlay">
+    <div class="delete-confirm-panel">
+      <div class="icon"><i class="fas fa-exclamation-triangle"></i></div>
+      <div class="message">Esta acción no se podrá deshacer</div>
+      <div class="actions">
+        <button class="btn-cancel" id="deleteConfirmCancel">Cancelar</button>
+        <button class="btn-danger" id="deleteConfirmAccept">Aceptar</button>
       </div>
     </div>
   </div>
@@ -1467,6 +1601,9 @@
     let feedScrollTop = 0;
     let feedRenderCounter = 0;
 
+    // Variable para almacenar el ID del post a eliminar
+    let postToDeleteId = null;
+
     function saveFeedScrollPosition() {
       if (document.getElementById('feedContainer')) {
         feedScrollTop = mainContent.scrollTop || 0;
@@ -1515,6 +1652,7 @@
     const musicPickerOverlay = document.getElementById('musicPickerOverlay');
     const musicPickerList = document.getElementById('musicPickerList');
     const closeMusicPickerBtn = document.getElementById('closeMusicPickerBtn');
+    const musicSearchInput = document.getElementById('musicSearchInput');
 
     // Elementos del diálogo de descarga
     const downloadOverlay = document.getElementById('downloadOverlay');
@@ -1522,6 +1660,11 @@
     const downloadImageScroll = document.getElementById('downloadImageScroll');
     const downloadConfirmBtn = document.getElementById('downloadConfirmBtn');
     const downloadCancelBtn = document.getElementById('downloadCancelBtn');
+
+    // Elementos del diálogo de confirmación de eliminación
+    const deleteConfirmOverlay = document.getElementById('deleteConfirmOverlay');
+    const deleteConfirmCancel = document.getElementById('deleteConfirmCancel');
+    const deleteConfirmAccept = document.getElementById('deleteConfirmAccept');
 
     mainContent.addEventListener('scroll', function() {
       if (document.getElementById('feedContainer')) {
@@ -2019,6 +2162,51 @@
     }
 
     // ============================================================
+    //  FUNCIÓN PARA ELIMINAR PUBLICACIÓN
+    // ============================================================
+    function showDeleteConfirm(postId) {
+      postToDeleteId = postId;
+      deleteConfirmOverlay.classList.add('active');
+    }
+
+    function closeDeleteConfirm() {
+      deleteConfirmOverlay.classList.remove('active');
+      postToDeleteId = null;
+    }
+
+    async function deletePost(postId) {
+      if (!postId) return;
+      try {
+        // Eliminar de Firebase
+        await database.ref(`posts/${postId}`).remove();
+
+        // Eliminar de la lista local
+        posts = posts.filter(p => p.id !== postId);
+        postOrder = postOrder.filter(id => id !== postId);
+
+        // Actualizar el feed si está visible
+        if (document.getElementById('feedContainer')) {
+          updateFeedContainer();
+        }
+
+        // Actualizar el perfil si está visible
+        const profileView = document.getElementById('profileView');
+        if (profileView) {
+          const viewedUid = profileView.dataset.uid;
+          if (viewedUid === currentUserId) {
+            showProfile(currentUserId);
+          }
+        }
+
+        closeDeleteConfirm();
+      } catch (err) {
+        console.warn('Error al eliminar publicación:', err);
+        alert('No se pudo eliminar la publicación.');
+        closeDeleteConfirm();
+      }
+    }
+
+    // ============================================================
     //  CREAR POST CARD
     // ============================================================
     function createPostCard(post) {
@@ -2453,10 +2641,17 @@
     function updateMusicPicker() {
       const selectBtn = document.getElementById('musicSelectBtn');
       const list = document.getElementById('musicPickerList');
+      const searchInput = document.getElementById('musicSearchInput');
       if (!selectBtn || !list) return;
 
       const currentValue = selectBtn.dataset.value || '';
+      const query = searchInput ? searchInput.value.toLowerCase() : '';
 
+      const filteredList = musicList.filter(item => 
+        (item.label || '').toLowerCase().includes(query)
+      );
+
+      // Actualizar la información seleccionada en el botón
       const selected = musicList.find(m => m.value === currentValue) || musicList[0] || { value: '', label: 'Sin música', icon: '' };
       const coverDiv = selectBtn.querySelector('.cover');
       const infoSpan = selectBtn.querySelector('.info');
@@ -2468,7 +2663,12 @@
       }
 
       list.innerHTML = '';
-      musicList.forEach(function(item) {
+      if (filteredList.length === 0) {
+        list.innerHTML = '<div class="music-empty-message">No se encontraron canciones</div>';
+        return;
+      }
+
+      filteredList.forEach(function(item) {
         const div = document.createElement('div');
         div.className = 'music-picker-item';
         if (item.value === currentValue) {
@@ -2526,11 +2726,16 @@
 
       musicPickerOverlay.classList.add('active');
       updateMusicPicker();
+      // Enfocar el campo de búsqueda al abrir
+      setTimeout(() => {
+        if (musicSearchInput) musicSearchInput.focus();
+      }, 100);
     }
 
     function closeMusicPicker() {
       musicPickerOverlay.classList.remove('active');
       resetMusicPreview();
+      if (musicSearchInput) musicSearchInput.value = '';
     }
 
     // ============================================================
@@ -2659,7 +2864,6 @@
 
     // ---- RENDER FEED ----
     function renderFeed() {
-      // Esta función ahora usa updateFeedContainer para mantener consistencia
       updateFeedContainer();
     }
 
@@ -3431,19 +3635,34 @@
               else if (post.imageUrl) imgUrl = post.imageUrl;
               return `<div class="post-item" data-post-id="${post.id}" style="background-image:url(${imgUrl}); background-size:cover; background-position:center;">
                 ${imgUrl ? '' : '<i class="fas fa-image"></i>'}
+                ${isOwnProfile ? `<button class="delete-post-btn" data-post-id="${post.id}"><i class="fas fa-trash"></i></button>` : ''}
               </div>`;
             }).join('')}
           </div>
         </div>
       `;
 
+      // Eventos para los items del grid
       container.querySelectorAll('.post-item').forEach(item => {
-        item.addEventListener('click', function() {
+        // Al hacer clic en la imagen (no en el botón de eliminar)
+        item.addEventListener('click', function(e) {
+          if (e.target.closest('.delete-post-btn')) return;
           const postId = this.dataset.postId;
           if (postId) {
             goToPost(postId);
           }
         });
+
+        const deleteBtn = item.querySelector('.delete-post-btn');
+        if (deleteBtn) {
+          deleteBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const postId = this.dataset.postId;
+            if (postId) {
+              showDeleteConfirm(postId);
+            }
+          });
+        }
       });
 
       if (isOwnProfile) {
@@ -3722,6 +3941,9 @@
     musicPickerOverlay.addEventListener('click', function(e) {
       if (e.target === this) closeMusicPicker();
     });
+    if (musicSearchInput) {
+      musicSearchInput.addEventListener('input', updateMusicPicker);
+    }
 
     // Eventos del diálogo de descarga
     downloadCancelBtn.addEventListener('click', closeDownloadDialog);
@@ -3729,6 +3951,19 @@
       if (e.target === this) closeDownloadDialog();
     });
     downloadConfirmBtn.addEventListener('click', downloadSelectedImages);
+
+    // Eventos del diálogo de confirmación de eliminación
+    deleteConfirmCancel.addEventListener('click', closeDeleteConfirm);
+    deleteConfirmAccept.addEventListener('click', function() {
+      if (postToDeleteId) {
+        deletePost(postToDeleteId);
+      } else {
+        closeDeleteConfirm();
+      }
+    });
+    deleteConfirmOverlay.addEventListener('click', function(e) {
+      if (e.target === this) closeDeleteConfirm();
+    });
 
     loadMusicFromJson().catch(() => {});
   </script>
