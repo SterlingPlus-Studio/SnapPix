@@ -914,21 +914,28 @@
       shell.className = 'lazy-media-shell' + (settings.fitContain ? ' fit-contain' : '');
       shell.dataset.lazyState = 'idle';
 
-      const spinner = document.createElement('div');
-      spinner.className = 'lazy-media-spinner';
-      spinner.innerHTML = '<i class="fas fa-circle-notch"></i>';
+      if (settings.placeholder) {
+        shell.dataset.lazyPlaceholder = String(settings.placeholder);
+      }
+      if (settings.srcset) {
+        shell.dataset.lazySrcset = String(settings.srcset);
+      }
+      if (settings.sizes) {
+        shell.dataset.lazySizes = String(settings.sizes);
+      }
 
       const img = document.createElement('img');
       img.alt = settings.alt || 'Imagen';
       img.dataset.lazySrc = url || '';
       img.dataset.loaded = '0';
       img.dataset.loading = '0';
+      img.dataset.lazyState = 'idle';
       img.decoding = 'async';
-      img.loading = 'eager';
-      img.src = 'data:image/gif;base64,R0lGODlhAQABAAAAACw=';
+      img.loading = settings.loading || 'lazy';
+      img.src = settings.placeholder || 'data:image/gif;base64,R0lGODlhAQABAAAAACw=';
       try { img.fetchPriority = settings.priority || 'auto'; } catch (err) {}
 
-      shell.appendChild(spinner);
+      shell.classList.add('blur-up');
       shell.appendChild(img);
       return shell;
     }
@@ -936,7 +943,10 @@
     function loadLazyMediaImage(img) {
       if (!img) return Promise.resolve(false);
       const src = img.dataset.lazySrc || img.dataset.src || '';
-      if (!src) return Promise.resolve(false);
+      const srcset = img.dataset.lazySrcset || img.dataset.srcset || '';
+      const sizes = img.dataset.lazySizes || img.dataset.sizes || '';
+      const placeholder = img.dataset.lazyPlaceholder || img.dataset.placeholder || img.dataset.lqip || img.dataset.lazyThumb || '';
+      if (!src && !srcset) return Promise.resolve(false);
       if (img.dataset.loaded === '1') return Promise.resolve(true);
       if (img.dataset.loading === '1') {
         return img._lazyLoadPromise || Promise.resolve(false);
@@ -946,24 +956,32 @@
       const shell = img.closest('.lazy-media-shell') || img.closest('.post-item') || img.closest('.search-post-media') || img.closest('.download-panel .image-item');
       if (shell) {
         shell.classList.remove('failed');
+        shell.classList.add('loading');
+        shell.classList.add('blur-up');
       }
 
       const promise = new Promise(function(resolve) {
+        let finalSourceRequested = false;
+
         const finish = function(success) {
           img.dataset.loading = '0';
           img.dataset.loaded = success ? '1' : '0';
           if (shell && shell.classList) {
+            shell.classList.toggle('loading', false);
             shell.classList.toggle('loaded', !!success);
             shell.classList.toggle('failed', !success);
+            shell.classList.toggle('blur-up', !success);
           }
           resolve(!!success);
         };
 
         try {
           img.onload = function() {
+            if (!finalSourceRequested) return;
             finish(true);
           };
           img.onerror = function() {
+            if (!finalSourceRequested) return;
             finish(false);
           };
           try { img.decoding = 'async'; } catch (err) {}
@@ -971,7 +989,41 @@
           if ('fetchPriority' in img) {
             try { img.fetchPriority = img.fetchPriority || 'auto'; } catch (err) {}
           }
-          img.src = src;
+
+          const commitSource = function() {
+            try {
+              finalSourceRequested = true;
+              if (srcset) {
+                img.srcset = srcset;
+              }
+              if (sizes) {
+                img.sizes = sizes;
+              }
+              if (src) {
+                img.src = src;
+              } else if (srcset && !img.src) {
+                img.src = placeholder || 'data:image/gif;base64,R0lGODlhAQABAAAAACw=';
+              }
+            } catch (err) {
+              finish(false);
+            }
+          };
+
+          if (placeholder && placeholder !== src) {
+            try {
+              img.src = placeholder;
+              img.dataset.placeholderApplied = '1';
+            } catch (err) {}
+            if (typeof requestAnimationFrame === 'function') {
+              requestAnimationFrame(function() {
+                requestAnimationFrame(commitSource);
+              });
+            } else {
+              setTimeout(commitSource, 16);
+            }
+          } else {
+            commitSource();
+          }
         } catch (err) {
           finish(false);
         }
@@ -981,9 +1033,10 @@
       return promise;
     }
 
+
     function loadLazyImagesInContainer(container) {
       if (!container) return;
-      const images = container.querySelectorAll('img[data-lazy-src]:not([data-loaded="1"])');
+      const images = container.querySelectorAll('img[data-lazy-src]:not([data-loaded="1"]), img[data-lazy-srcset]:not([data-loaded="1"]), img[data-src]:not([data-loaded="1"]), img[data-srcset]:not([data-loaded="1"])');
       if (!images.length) return;
 
       images.forEach(function(img) {
@@ -1028,7 +1081,7 @@
       }
 
       if (!supportsIntersectionObserver) {
-        document.querySelectorAll('img[data-lazy-src]:not([data-loaded="1"])').forEach(function(img) {
+        document.querySelectorAll('img[data-lazy-src]:not([data-loaded="1"]), img[data-lazy-srcset]:not([data-loaded="1"]), img[data-src]:not([data-loaded="1"]), img[data-srcset]:not([data-loaded="1"])').forEach(function(img) {
           loadLazyMediaImage(img);
         });
         return;
@@ -3582,7 +3635,7 @@ function buildSearchPostCard(item, postId) {
             <div class="search-post-media ${imageSrc ? '' : 'empty'}">
               ${imageSrc ? `
                 <div class="lazy-media-shell">
-                  <div class="lazy-media-spinner"><i class="fas fa-circle-notch"></i></div>
+                  
                   <img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" data-lazy-src="${imageSrc}" alt="Preview" loading="eager" decoding="async" />
                 </div>` : `<div class="search-post-placeholder"><i class="fas fa-image"></i></div>`}
             </div>
@@ -4234,7 +4287,7 @@ function buildSearchPostCard(item, postId) {
       let avatarContent = '';
       const resolvedAvatar = getResolvedProfileAvatar(userData);
       if (resolvedAvatar) {
-        avatarContent = `<div class="lazy-media-shell" style="border-radius:50%;"><div class="lazy-media-spinner"><i class="fas fa-circle-notch"></i></div><img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" data-lazy-src="${resolvedAvatar}" alt="Avatar" loading="eager" decoding="async" style="object-fit:cover;border-radius:50%;" /></div>`;
+        avatarContent = `<div class="lazy-media-shell" style="border-radius:50%;"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" data-lazy-src="${resolvedAvatar}" alt="Avatar" loading="eager" decoding="async" style="object-fit:cover;border-radius:50%;" /></div>`;
       } else {
         avatarContent = `<i class="fas fa-user-circle"></i>`;
       }
@@ -4304,7 +4357,7 @@ function buildSearchPostCard(item, postId) {
               return `<div class="post-item" data-post-id="${post.id}">
                 ${imgUrl ? `
                   <div class="lazy-media-shell">
-                    <div class="lazy-media-spinner"><i class="fas fa-circle-notch"></i></div>
+                    
                     <img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" data-lazy-src="${imgUrl}" alt="Miniatura" loading="eager" decoding="async" />
                   </div>` : '<i class="fas fa-image"></i>'}
                 ${isOwnProfile ? `<button class="delete-post-btn" data-post-id="${post.id}"><i class="fas fa-trash"></i></button>` : ''}
