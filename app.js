@@ -28,7 +28,191 @@
     ];
     const IMAGE_PRECONNECT_CACHE = new Set();
     const IMAGE_OPTIMIZATION_SKIP_SELECTOR = 'svg, canvas, video, audio, iframe, picture';
+    const IMAGE_LOCAL_CACHE_KEY = 'snappix_image_local_cache_v2';
+    const IMAGE_DRAFT_CACHE_KEY = 'snappix_selected_images_draft_v2';
+    const IMAGE_LOCAL_CACHE_LIMIT = 80;
+    const IMAGE_DRAFT_LIMIT = 12;
     let imageOptimizationObserver = null;
+    let imageLocalCache = loadImageLocalCache();
+    let imageLocalCacheSaveTimer = null;
+
+    function isGifImageUrl(url) {
+      if (!url) return false;
+      const value = String(url).trim().toLowerCase();
+      return value.indexOf('data:image/gif') === 0 || /\.gif(?:$|[?#])/i.test(value);
+    }
+
+    function loadJsonFromStorage(storageKey, fallbackValue) {
+      try {
+        const raw = localStorage.getItem(storageKey);
+        if (!raw) return fallbackValue;
+        const parsed = JSON.parse(raw);
+        return parsed && typeof parsed === 'object' ? parsed : fallbackValue;
+      } catch (err) {
+        return fallbackValue;
+      }
+    }
+
+    function saveJsonToStorage(storageKey, value) {
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(value));
+        return true;
+      } catch (err) {
+        return false;
+      }
+    }
+
+    function loadImageLocalCache() {
+      const cached = loadJsonFromStorage(IMAGE_LOCAL_CACHE_KEY, null);
+      if (!cached) return Object.create(null);
+
+      const cleaned = Object.create(null);
+      const keys = Object.keys(cached).sort(function(a, b) {
+        const aTs = Number(cached[a] && cached[a].ts) || 0;
+        const bTs = Number(cached[b] && cached[b].ts) || 0;
+        return bTs - aTs;
+      });
+
+      keys.slice(0, IMAGE_LOCAL_CACHE_LIMIT).forEach(function(url) {
+        if (!url) return;
+        const entry = cached[url];
+        if (!entry || typeof entry !== 'object') return;
+        cleaned[url] = {
+          ts: Number(entry.ts) || Date.now(),
+          type: entry.type === 'gif' ? 'gif' : 'image',
+          hits: Number(entry.hits) || 0
+        };
+      });
+
+      return cleaned;
+    }
+
+    function persistImageLocalCacheSoon() {
+      if (imageLocalCacheSaveTimer) return;
+      imageLocalCacheSaveTimer = setTimeout(function() {
+        imageLocalCacheSaveTimer = null;
+        const entries = Object.keys(imageLocalCache).map(function(url) {
+          return [url, imageLocalCache[url]];
+        }).sort(function(a, b) {
+          const aTs = Number(a[1] && a[1].ts) || 0;
+          const bTs = Number(b[1] && b[1].ts) || 0;
+          return bTs - aTs;
+        }).slice(0, IMAGE_LOCAL_CACHE_LIMIT);
+
+        const payload = {};
+        entries.forEach(function(pair) {
+          payload[pair[0]] = {
+            ts: Number(pair[1] && pair[1].ts) || Date.now(),
+            type: pair[1] && pair[1].type === 'gif' ? 'gif' : 'image',
+            hits: Number(pair[1] && pair[1].hits) || 0
+          };
+        });
+
+        saveJsonToStorage(IMAGE_LOCAL_CACHE_KEY, payload);
+      }, 250);
+    }
+
+    function rememberImageUrlInLocalCache(url, explicitType) {
+      if (!url) return;
+      const key = String(url);
+      const prev = imageLocalCache[key] || {};
+      imageLocalCache[key] = {
+        ts: Date.now(),
+        type: explicitType === 'gif' || isGifImageUrl(key) ? 'gif' : 'image',
+        hits: (Number(prev.hits) || 0) + 1
+      };
+      persistImageLocalCacheSoon();
+    }
+
+    function wasImageSeenLocally(url) {
+      if (!url) return false;
+      return !!imageLocalCache[String(url)];
+    }
+
+    function loadSelectedImagesDraft() {
+      const draft = loadJsonFromStorage(IMAGE_DRAFT_CACHE_KEY, null);
+      if (!draft) return [];
+      const images = Array.isArray(draft.images) ? draft.images : [];
+      return images.filter(function(item) {
+        return typeof item === 'string' && item;
+      }).slice(0, IMAGE_DRAFT_LIMIT);
+    }
+
+    function persistSelectedImagesDraft(imagesData) {
+      const images = Array.isArray(imagesData) ? imagesData.filter(function(item) {
+        return typeof item === 'string' && item;
+      }) : [];
+
+      const capped = images.slice(0, IMAGE_DRAFT_LIMIT);
+      const totalLength = capped.reduce(function(total, value) {
+        return total + String(value).length;
+      }, 0);
+
+      const payload = {
+        updatedAt: Date.now(),
+        images: capped,
+        count: capped.length,
+        hasGif: capped.some(function(value) { return isGifImageUrl(value); }),
+        totalLength: totalLength
+      };
+
+      saveJsonToStorage(IMAGE_DRAFT_CACHE_KEY, payload);
+      capped.forEach(function(value) {
+        rememberImageUrlInLocalCache(value, isGifImageUrl(value) ? 'gif' : 'image');
+      });
+    }
+
+    function clearSelectedImagesDraft() {
+      try {
+        localStorage.removeItem(IMAGE_DRAFT_CACHE_KEY);
+      } catch (err) {}
+    }
+
+    function getImagePriorityForUrl(url, currentPriority) {
+      if (currentPriority) return currentPriority;
+      if (isGifImageUrl(url)) return 'low';
+      if (wasImageSeenLocally(url)) return 'low';
+      return 'auto';
+    }
+
+    function getImagePriorityForElement(img, explicitPriority) {
+      if (!img || !img.closest) {
+        return explicitPriority || 'auto';
+      }
+
+      const src = img.getAttribute('src') || img.dataset.lazySrc || img.dataset.src || '';
+      const srcset = img.getAttribute('srcset') || img.dataset.lazySrcset || img.dataset.srcset || '';
+      const priorityHint = explicitPriority || img.dataset.imagePriority || '';
+
+      let priority = getImagePriorityForUrl(src, priorityHint);
+      if ((!priority || priority === 'auto') && srcset) {
+        const firstCandidate = srcset.split(',')[0];
+        if (firstCandidate) {
+          priority = getImagePriorityForUrl(firstCandidate.trim().split(' ')[0], priorityHint);
+        }
+      }
+
+      if (img.closest('.carousel-slide')) {
+        const slide = img.closest('.carousel-slide');
+        const card = slide.closest('.post-card');
+        if (card && card.querySelector('.carousel-slide') === slide) return 'high';
+        return priority === 'auto' ? 'low' : priority;
+      }
+
+      if (img.closest('.login-view') || img.closest('.download-overlay') || img.closest('.upload-item-overlay')) {
+        return 'high';
+      }
+
+      if (img.closest('.chat-message-avatar') || img.closest('.post-profile-avatar') || img.closest('.post-author-name-row')) {
+        return 'low';
+      }
+
+      if (img.closest('.search-results') || img.closest('.shop-view') || img.closest('.profile-view')) {
+        return priority === 'auto' ? 'low' : priority;
+      }
+
+      return priority || 'auto';
+    }
 
     function getConnectionInfo() {
       try {
@@ -79,32 +263,6 @@
       return !!img && img.tagName === 'IMG' && !img.closest(IMAGE_OPTIMIZATION_SKIP_SELECTOR);
     }
 
-    function getImagePriorityForElement(img, explicitPriority) {
-      if (explicitPriority) return explicitPriority;
-      if (!img || !img.closest) return 'auto';
-
-      if (img.closest('.carousel-slide')) {
-        const slide = img.closest('.carousel-slide');
-        const card = slide.closest('.post-card');
-        if (card && card.querySelector('.carousel-slide') === slide) return 'high';
-        return 'low';
-      }
-
-      if (img.closest('.login-view') || img.closest('.download-overlay') || img.closest('.upload-item-overlay')) {
-        return 'high';
-      }
-
-      if (img.closest('.chat-message-avatar') || img.closest('.post-profile-avatar') || img.closest('.post-author-name-row')) {
-        return 'low';
-      }
-
-      if (img.closest('.search-results') || img.closest('.shop-view') || img.closest('.profile-view')) {
-        return 'low';
-      }
-
-      return 'auto';
-    }
-
     function optimizeImageElement(img, options) {
       if (!isOptimizableImageElement(img)) return;
       if (img.dataset.imageOptimized === '1') return;
@@ -137,6 +295,7 @@
       const src = img.getAttribute('src');
       const lazySrc = img.dataset.lazySrc || img.dataset.src || '';
       const srcset = img.getAttribute('srcset') || img.dataset.lazySrcset || img.dataset.srcset || '';
+      const imageTypeHint = isGifImageUrl(src || lazySrc || srcset) ? 'gif' : 'image';
 
       if (src) registerImageOriginHint(src);
       if (lazySrc) registerImageOriginHint(lazySrc);
@@ -151,6 +310,7 @@
         img.setAttribute('referrerpolicy', 'no-referrer-when-downgrade');
       }
 
+      rememberImageUrlInLocalCache(src || lazySrc || (srcset ? srcset.split(',')[0].trim().split(' ')[0] : ''), imageTypeHint);
       img.dataset.imageOptimized = '1';
     }
 
@@ -164,6 +324,7 @@
     }
 
     function setupGlobalImageOptimizer() {
+      imageLocalCache = loadImageLocalCache();
       optimizeImagesInContainer(document);
 
       if (imageOptimizationObserver) {
@@ -1004,6 +1165,7 @@
     function preloadImage(url, priority) {
       if (!url) return Promise.resolve(null);
       const normalizedUrl = String(url);
+      const isGif = isGifImageUrl(normalizedUrl);
       registerImageOriginHint(normalizedUrl);
       if (IMAGE_PRELOAD_CACHE.has(normalizedUrl)) {
         return IMAGE_PRELOAD_CACHE.get(normalizedUrl);
@@ -1012,12 +1174,13 @@
       const promise = new Promise(function(resolve) {
         const img = new Image();
         try { img.decoding = 'async'; } catch (err) {}
-        try { img.loading = priority === 'high' ? 'eager' : 'lazy'; } catch (err) {}
-        if (priority && 'fetchPriority' in img) {
-          try { img.fetchPriority = priority; } catch (err) {}
+        try { img.loading = priority === 'high' && !isGif ? 'eager' : 'lazy'; } catch (err) {}
+        if ('fetchPriority' in img) {
+          try { img.fetchPriority = priority === 'high' && !isGif ? 'high' : 'low'; } catch (err) {}
         }
 
         img.onload = function() {
+          rememberImageUrlInLocalCache(normalizedUrl, isGif ? 'gif' : 'image');
           resolve(normalizedUrl);
         };
         img.onerror = function() {
@@ -1028,6 +1191,7 @@
           img.src = normalizedUrl;
           if (typeof img.decode === 'function') {
             img.decode().then(function() {
+              rememberImageUrlInLocalCache(normalizedUrl, isGif ? 'gif' : 'image');
               resolve(normalizedUrl);
             }).catch(function() {
               resolve(normalizedUrl);
@@ -1045,6 +1209,7 @@
     function queueImagePrefetch(url, priority) {
       if (!url || IMAGE_PRELOAD_CACHE.has(url)) return;
       if (shouldReduceAggressivePrefetch() && (priority || 'low') !== 'high') return;
+      if (isGifImageUrl(url) && (priority || 'low') !== 'high') return;
       IMAGE_PREFETCH_QUEUE.push({ url: url, priority: priority || 'low' });
       if (imagePrefetchScheduled) return;
       imagePrefetchScheduled = true;
@@ -1159,6 +1324,8 @@
         try {
           img.onload = function() {
             if (!finalSourceRequested) return;
+            const cachedSource = src || (srcset ? srcset.split(',')[0].trim().split(' ')[0] : '');
+            rememberImageUrlInLocalCache(cachedSource, isGifImageUrl(cachedSource) ? 'gif' : 'image');
             img.dataset.imageOptimized = '1';
             finish(true);
           };
@@ -4277,7 +4444,8 @@ function buildSearchPostCard(item, postId) {
       setActiveScreen('create');
       stopAllMusic();
       closeComments();
-      selectedImagesData = preloadedImages.length > 0 ? preloadedImages : [];
+      selectedImagesData = preloadedImages.length > 0 ? preloadedImages : loadSelectedImagesDraft();
+      selectedImagesData = selectedImagesData.slice(0, IMAGE_DRAFT_LIMIT);
       clearMainContent();
       showTopBar(false);
 
@@ -4386,6 +4554,8 @@ function buildSearchPostCard(item, postId) {
           item.appendChild(removeBtn);
           grid.appendChild(item);
         });
+
+        persistSelectedImagesDraft(selectedImagesData);
       }
 
       const selectImageBtn = document.getElementById('selectImageBtn');
@@ -4443,6 +4613,7 @@ function buildSearchPostCard(item, postId) {
         const musicTitle = selectedMusic ? selectedMusic.label : '';
 
         createPost(selectedImagesData, description, musicUrl, musicTitle);
+        clearSelectedImagesDraft();
         resetMusicPreview();
         stopAllMusic();
       });
@@ -5136,7 +5307,21 @@ function buildSearchPostCard(item, postId) {
       }
     });
     window.addEventListener('pagehide', function() {
+      try {
+        if (Array.isArray(selectedImagesData) && selectedImagesData.length > 0) {
+          persistSelectedImagesDraft(selectedImagesData);
+        }
+        saveJsonToStorage(IMAGE_LOCAL_CACHE_KEY, imageLocalCache);
+      } catch (err) {}
       stopAllMusic();
+    });
+    window.addEventListener('beforeunload', function() {
+      try {
+        if (Array.isArray(selectedImagesData) && selectedImagesData.length > 0) {
+          persistSelectedImagesDraft(selectedImagesData);
+        }
+        saveJsonToStorage(IMAGE_LOCAL_CACHE_KEY, imageLocalCache);
+      } catch (err) {}
     });
 
     closeMusicPickerBtn.addEventListener('click', closeMusicPicker);
