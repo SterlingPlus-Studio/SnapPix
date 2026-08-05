@@ -321,7 +321,7 @@ body.top-bar-hidden .post-card {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: linear-gradient(180deg, #101010 0%, #080808 100%);
+  background: transparent;
   contain: paint;
 }
 .lazy-media-shell img {
@@ -330,30 +330,31 @@ body.top-bar-hidden .post-card {
   object-fit: cover;
   display: block;
   opacity: 0;
-  transform: scale(1.04);
-  filter: blur(18px);
-  transition: opacity 0.42s ease, transform 0.42s ease, filter 0.42s ease;
-  background: #111;
-  will-change: opacity, transform, filter;
+  transform: translateY(8px);
+  clip-path: inset(0 0 100% 0);
+  -webkit-clip-path: inset(0 0 100% 0);
+  transition: opacity 0.2s ease, transform 0.55s ease, clip-path 0.55s ease, -webkit-clip-path 0.55s ease;
+  background: transparent;
+  will-change: opacity, transform, clip-path;
 }
 .lazy-media-shell.fit-contain img {
   object-fit: contain;
-  background: #000;
+  background: transparent;
 }
-.lazy-media-shell.blur-up img,
 .lazy-media-shell.loading img {
-  opacity: 0.55;
-  transform: scale(1.04);
-  filter: blur(18px);
+  opacity: 0;
+  transform: translateY(8px);
 }
 .lazy-media-shell.loaded img {
   opacity: 1;
-  transform: scale(1);
-  filter: blur(0);
+  transform: translateY(0);
+  clip-path: inset(0 0 0 0);
+  -webkit-clip-path: inset(0 0 0 0);
 }
 .lazy-media-shell.failed img {
   opacity: 0;
-  filter: blur(0);
+  clip-path: inset(0 0 100% 0);
+  -webkit-clip-path: inset(0 0 100% 0);
 }.post-card::after {
   content: '';
   position: absolute;
@@ -1820,20 +1821,25 @@ body.comments-open .main-content {
 .coin-icon {
   width: 18px;
   height: 18px;
-  object-fit: contain;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   vertical-align: middle;
   flex-shrink: 0;
+  font-size: 18px;
+  line-height: 1;
 }
 .profile-coins .coin-icon,
 .shop-coins .coin-icon,
 .buy-btn-price .coin-icon {
   width: 18px;
   height: 18px;
+  font-size: 18px;
 }
 .coin-bubble .coin-icon {
   width: 32px;
   height: 32px;
+  font-size: 32px;
 }
 .profile-posts { margin-top: 8px; }
 .profile-posts h4 { font-size: 16px; color: #fff; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }

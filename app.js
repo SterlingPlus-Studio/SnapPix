@@ -35,6 +35,40 @@
     let imageOptimizationObserver = null;
     let imageLocalCache = loadImageLocalCache();
     let imageLocalCacheSaveTimer = null;
+    const TRANSPARENT_PLACEHOLDER_SRC = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"></svg>');
+
+    function sanitizeRenderableImageUrl(url) {
+      if (!url) return null;
+      const value = String(url).trim();
+      return isGifImageUrl(value) ? null : value;
+    }
+
+    function neutralizeGifImageElement(img) {
+      if (!img || !img.getAttribute) return false;
+      const src = img.getAttribute('src') || img.dataset.lazySrc || img.dataset.src || '';
+      const srcset = img.getAttribute('srcset') || img.dataset.lazySrcset || img.dataset.srcset || '';
+      if (!isGifImageUrl(src || srcset)) return false;
+
+      try {
+        img.removeAttribute('srcset');
+        img.removeAttribute('sizes');
+        img.dataset.lazySrc = '';
+        img.dataset.lazySrcset = '';
+        img.dataset.src = '';
+        img.dataset.srcset = '';
+        img.dataset.mediaKind = 'blocked';
+        img.dataset.loaded = '0';
+        img.dataset.loading = '0';
+        img.alt = img.alt || 'Imagen bloqueada';
+        img.src = TRANSPARENT_PLACEHOLDER_SRC;
+        img.classList.add('gif-blocked');
+        if (img.parentElement) {
+          img.parentElement.classList.add('blocked-gif');
+        }
+      } catch (err) {}
+      return true;
+    }
+
 
     function isGifImageUrl(url) {
       if (!url) return false;
@@ -74,12 +108,12 @@
       });
 
       keys.slice(0, IMAGE_LOCAL_CACHE_LIMIT).forEach(function(url) {
-        if (!url) return;
+        if (!url || isGifImageUrl(url)) return;
         const entry = cached[url];
         if (!entry || typeof entry !== 'object') return;
         cleaned[url] = {
           ts: Number(entry.ts) || Date.now(),
-          type: entry.type === 'gif' ? 'gif' : 'image',
+          type: 'image',
           hits: Number(entry.hits) || 0
         };
       });
@@ -93,6 +127,8 @@
         imageLocalCacheSaveTimer = null;
         const entries = Object.keys(imageLocalCache).map(function(url) {
           return [url, imageLocalCache[url]];
+        }).filter(function(pair) {
+          return pair && pair[0] && !isGifImageUrl(pair[0]);
         }).sort(function(a, b) {
           const aTs = Number(a[1] && a[1].ts) || 0;
           const bTs = Number(b[1] && b[1].ts) || 0;
@@ -103,7 +139,7 @@
         entries.forEach(function(pair) {
           payload[pair[0]] = {
             ts: Number(pair[1] && pair[1].ts) || Date.now(),
-            type: pair[1] && pair[1].type === 'gif' ? 'gif' : 'image',
+            type: 'image',
             hits: Number(pair[1] && pair[1].hits) || 0
           };
         });
@@ -113,12 +149,12 @@
     }
 
     function rememberImageUrlInLocalCache(url, explicitType) {
-      if (!url) return;
+      if (!url || isGifImageUrl(url)) return;
       const key = String(url);
       const prev = imageLocalCache[key] || {};
       imageLocalCache[key] = {
         ts: Date.now(),
-        type: explicitType === 'gif' || isGifImageUrl(key) ? 'gif' : 'image',
+        type: 'image',
         hits: (Number(prev.hits) || 0) + 1
       };
       persistImageLocalCacheSoon();
@@ -134,13 +170,13 @@
       if (!draft) return [];
       const images = Array.isArray(draft.images) ? draft.images : [];
       return images.filter(function(item) {
-        return typeof item === 'string' && item;
+        return typeof item === 'string' && item && sanitizeRenderableImageUrl(item);
       }).slice(0, IMAGE_DRAFT_LIMIT);
     }
 
     function persistSelectedImagesDraft(imagesData) {
       const images = Array.isArray(imagesData) ? imagesData.filter(function(item) {
-        return typeof item === 'string' && item;
+        return typeof item === 'string' && item && sanitizeRenderableImageUrl(item);
       }) : [];
 
       const capped = images.slice(0, IMAGE_DRAFT_LIMIT);
@@ -152,13 +188,12 @@
         updatedAt: Date.now(),
         images: capped,
         count: capped.length,
-        hasGif: capped.some(function(value) { return isGifImageUrl(value); }),
         totalLength: totalLength
       };
 
       saveJsonToStorage(IMAGE_DRAFT_CACHE_KEY, payload);
       capped.forEach(function(value) {
-        rememberImageUrlInLocalCache(value, isGifImageUrl(value) ? 'gif' : 'image');
+        rememberImageUrlInLocalCache(value, 'image');
       });
     }
 
@@ -170,7 +205,6 @@
 
     function getImagePriorityForUrl(url, currentPriority) {
       if (currentPriority) return currentPriority;
-      if (isGifImageUrl(url)) return 'low';
       if (wasImageSeenLocally(url)) return 'low';
       return 'auto';
     }
@@ -265,6 +299,7 @@
 
     function optimizeImageElement(img, options) {
       if (!isOptimizableImageElement(img)) return;
+      if (neutralizeGifImageElement(img)) return;
       if (img.dataset.imageOptimized === '1') return;
 
       const settings = options || {};
@@ -295,7 +330,7 @@
       const src = img.getAttribute('src');
       const lazySrc = img.dataset.lazySrc || img.dataset.src || '';
       const srcset = img.getAttribute('srcset') || img.dataset.lazySrcset || img.dataset.srcset || '';
-      const imageTypeHint = isGifImageUrl(src || lazySrc || srcset) ? 'gif' : 'image';
+      const imageTypeHint = 'image';
 
       if (src) registerImageOriginHint(src);
       if (lazySrc) registerImageOriginHint(lazySrc);
@@ -341,6 +376,10 @@
           mutation.addedNodes.forEach(function(node) {
             if (!node || node.nodeType !== 1) return;
             if (node.tagName === 'IMG') {
+              if (neutralizeGifImageElement(node)) {
+                scheduleImageRecoveryScan(node.parentNode || document, false);
+                return;
+              }
               optimizeImageElement(node);
               scheduleImageRecoveryScan(node.parentNode || document, false);
               return;
@@ -470,7 +509,6 @@
     let editOriginalSelectedFrame = null;
     const VERIFIED_STICKER_OPTIONS = [
       'https://i.ibb.co/Y7Y2pffJ/facebook-verificado.png',
-      'https://i.ibb.co/xq2x51RK/anime-dance.gif',
       'https://i.ibb.co/TDzF8B6f/1784763007641.png'
     ];
 
@@ -485,7 +523,7 @@
       const item = getShopItemById(itemId);
       if (!item) return null;
       if (category && item.category !== category) return null;
-      return item.imageUrl || null;
+      return sanitizeRenderableImageUrl(item.imageUrl || null);
     }
 
     function sortItemsNewestFirst(items) {
@@ -498,14 +536,89 @@
 
     function getResolvedProfileAvatar(userData) {
       if (!userData) return null;
-      return getShopItemImageUrl(userData.selectedFrame, 'profileFrames') || userData.avatar || null;
+      return getShopItemImageUrl(userData.selectedFrame, 'profileFrames') || sanitizeRenderableImageUrl(userData.avatar) || null;
+    }
+
+    function getLoadedShopItemIdSet() {
+      const ids = new Set();
+      if (!Array.isArray(userShopItems)) return ids;
+      userShopItems.forEach(function(item) {
+        if (item && item.id) ids.add(String(item.id));
+      });
+      return ids;
+    }
+
+    function pruneProfileAgainstLoadedShop(profile, uid) {
+      if (!profile || typeof profile !== 'object') {
+        return { changed: false, profile: profile, updates: {} };
+      }
+
+      const cleaned = { ...profile };
+      const updates = {};
+      let changed = false;
+
+      const safeAvatar = sanitizeRenderableImageUrl(cleaned.avatar);
+      if (cleaned.avatar && !safeAvatar) {
+        cleaned.avatar = null;
+        updates.avatar = null;
+        changed = true;
+      }
+
+      const shopReady = Array.isArray(userShopItems) && userShopItems.length > 0;
+      if (shopReady) {
+        const availableIds = getLoadedShopItemIdSet();
+
+        if (Array.isArray(cleaned.purchasedItems)) {
+          const filteredPurchased = cleaned.purchasedItems.filter(function(itemId) {
+            return availableIds.has(String(itemId));
+          });
+          if (filteredPurchased.length !== cleaned.purchasedItems.length) {
+            cleaned.purchasedItems = filteredPurchased;
+            updates.purchasedItems = filteredPurchased;
+            changed = true;
+          }
+        }
+
+        ['selectedFrame', 'selectedParticles', 'selectedVerifiedSticker'].forEach(function(field) {
+          if (cleaned[field] && !availableIds.has(String(cleaned[field]))) {
+            cleaned[field] = null;
+            updates[field] = null;
+            changed = true;
+          }
+        });
+      }
+
+      if (uid && changed) {
+        database.ref('users/' + uid).update(updates).catch(function(err) {
+          console.warn('No se pudo limpiar el perfil ' + uid + ':', err);
+        });
+      }
+
+      return { changed: changed, profile: cleaned, updates: updates };
+    }
+
+    function pruneAllLoadedProfilesAgainstShop() {
+      if (!Array.isArray(userShopItems) || userShopItems.length === 0) return;
+      if (profileData && currentUserId) {
+        const currentResult = pruneProfileAgainstLoadedShop(profileData, currentUserId);
+        profileData = currentResult.profile;
+        if (userProfiles[currentUserId]) {
+          userProfiles[currentUserId] = { ...userProfiles[currentUserId], ...currentResult.profile };
+        }
+      }
+      Object.keys(userProfiles).forEach(function(uid) {
+        const profile = userProfiles[uid];
+        if (!profile) return;
+        const result = pruneProfileAgainstLoadedShop(profile, uid);
+        userProfiles[uid] = result.profile;
+      });
     }
 
     function getResolvedVerifiedSticker(userData) {
       if (!userData) return null;
       const selectedSticker = getShopItemImageUrl(userData.selectedVerifiedSticker, 'verifiedStickers');
       if (selectedSticker) return selectedSticker;
-      return userData.verifiedSticker || null;
+      return sanitizeRenderableImageUrl(userData.verifiedSticker) || null;
     }
 
     function getResolvedParticleImageUrl(userData) {
@@ -516,10 +629,10 @@
     function getPostImageUrls(post) {
       if (!post) return [];
       if (post.images && Array.isArray(post.images) && post.images.length > 0) {
-        return post.images.filter(function(url) { return !!url; });
+        return post.images.filter(function(url) { return !!sanitizeRenderableImageUrl(url); });
       }
       if (post.imageUrl) {
-        return [post.imageUrl];
+        return sanitizeRenderableImageUrl(post.imageUrl) ? [post.imageUrl] : [];
       }
       return [];
     }
@@ -663,12 +776,12 @@
     }
 
     function createInlineParticleEffectLayer(particleUrl) {
-      if (!particleUrl) return null;
+      if (!particleUrl || isGifImageUrl(particleUrl)) return null;
 
       const layer = document.createElement('div');
       layer.className = 'post-particle-effect-layer';
 
-      const isImage = /\.(png|jpe?g|gif|webp|svg)(\?|$)/i.test(particleUrl) || particleUrl.indexOf('data:') === 0;
+      const isImage = /\.(png|jpe?g|webp|svg)(\?|$)/i.test(particleUrl) || particleUrl.indexOf('data:') === 0;
       let html = '';
       for (let i = 0; i < 12; i++) {
         const left = Math.random() * 100;
@@ -690,7 +803,7 @@
 
     function renderParticleEffect(particleUrl) {
       let layer = document.getElementById('particleEffectLayer');
-      if (!particleUrl) {
+      if (!particleUrl || isGifImageUrl(particleUrl)) {
         if (layer) layer.remove();
         return;
       }
@@ -700,7 +813,7 @@
         layer.className = 'particle-effect-layer';
         document.body.appendChild(layer);
       }
-      const isImage = /\.(png|jpe?g|gif|webp|svg)(\?|$)/i.test(particleUrl) || particleUrl.indexOf('data:') === 0;
+      const isImage = /\.(png|jpe?g|webp|svg)(\?|$)/i.test(particleUrl) || particleUrl.indexOf('data:') === 0;
       let html = '';
       for (let i = 0; i < 18; i++) {
         const left = Math.random() * 100;
@@ -1248,11 +1361,14 @@
     const IMAGE_PRELOAD_CACHE = new Map();
     const IMAGE_PREFETCH_QUEUE = [];
     let imagePrefetchScheduled = false;
+    const IMAGE_VISIBLE_LOAD_QUEUE = [];
+    let imageVisibleLoadActive = false;
 
     function preloadImage(url, priority) {
       if (!url) return Promise.resolve(null);
       const normalizedUrl = String(url);
       const isGif = isGifImageUrl(normalizedUrl);
+      if (isGif) return Promise.resolve(null);
       registerImageOriginHint(normalizedUrl);
       if (IMAGE_PRELOAD_CACHE.has(normalizedUrl)) {
         return IMAGE_PRELOAD_CACHE.get(normalizedUrl);
@@ -1295,15 +1411,23 @@
 
     function queueImagePrefetch(url, priority) {
       if (!url || IMAGE_PRELOAD_CACHE.has(url)) return;
-      if (shouldReduceAggressivePrefetch() && (priority || 'low') !== 'high') return;
-      if (isGifImageUrl(url) && (priority || 'low') !== 'high') return;
-      IMAGE_PREFETCH_QUEUE.push({ url: url, priority: priority || 'low' });
+      const normalizedUrl = String(url);
+      const isHighPriority = (priority || 'low') === 'high';
+
+      if (!isHighPriority && !wasImageSeenLocally(normalizedUrl)) {
+        return;
+      }
+
+      if (shouldReduceAggressivePrefetch() && !isHighPriority) return;
+      if (isGifImageUrl(normalizedUrl)) return;
+
+      IMAGE_PREFETCH_QUEUE.push({ url: normalizedUrl, priority: isHighPriority ? 'high' : 'low' });
       if (imagePrefetchScheduled) return;
       imagePrefetchScheduled = true;
 
       var runQueue = function() {
         imagePrefetchScheduled = false;
-        var batch = IMAGE_PREFETCH_QUEUE.splice(0, 8);
+        var batch = IMAGE_PREFETCH_QUEUE.splice(0, 1);
         batch.forEach(function(item) {
           preloadImage(item.url, item.priority);
         });
@@ -1314,9 +1438,9 @@
 
       function schedulePrefetch() {
         if (typeof requestIdleCallback === 'function') {
-          requestIdleCallback(runQueue, { timeout: 450 });
+          requestIdleCallback(runQueue, { timeout: 500 });
         } else {
-          setTimeout(runQueue, 120);
+          setTimeout(runQueue, 160);
         }
       }
 
@@ -1325,14 +1449,13 @@
 
     function warmUpPostImages(postList) {
       const source = Array.isArray(postList) ? postList : [];
-      const limited = source.slice(0, 5);
-      limited.forEach(function(post, postIndex) {
+      const limited = source.slice(0, 2);
+      limited.forEach(function(post) {
         const images = getPostImageUrls(post);
         if (!images.length) return;
-        const maxImages = postIndex === 0 ? Math.min(images.length, 6) : Math.min(images.length, 4);
-        images.slice(0, maxImages).forEach(function(url, imageIndex) {
+        images.slice(0, 1).forEach(function(url) {
           if (!url) return;
-          queueImagePrefetch(url, postIndex === 0 ? 'high' : (imageIndex === 0 ? 'high' : 'low'));
+          registerImageOriginHint(url);
         });
       });
     }
@@ -1340,9 +1463,10 @@
     function createLazyMediaShell(url, options) {
       const settings = options || {};
       const shell = document.createElement('div');
+      const safeUrl = sanitizeRenderableImageUrl(url);
       shell.className = 'lazy-media-shell' + (settings.fitContain ? ' fit-contain' : '');
       shell.dataset.lazyState = 'idle';
-      shell.dataset.mediaKind = isGifImageUrl(url) ? 'gif' : 'image';
+      shell.dataset.mediaKind = safeUrl ? 'image' : 'blocked';
 
       if (settings.placeholder) {
         shell.dataset.lazyPlaceholder = String(settings.placeholder);
@@ -1364,17 +1488,21 @@
 
       const img = document.createElement('img');
       img.alt = settings.alt || 'Imagen';
-      img.dataset.lazySrc = url || '';
+      img.dataset.lazySrc = safeUrl || '';
       img.dataset.loaded = '0';
       img.dataset.loading = '0';
       img.dataset.lazyState = 'idle';
       img.dataset.mediaKind = shell.dataset.mediaKind;
       img.decoding = 'async';
-      img.loading = isGifImageUrl(url) ? 'lazy' : (settings.loading || 'lazy');
-      img.src = settings.placeholder || 'data:image/gif;base64,R0lGODlhAQABAAAAACw=';
-      try { img.fetchPriority = isGifImageUrl(url) ? 'low' : (settings.priority || 'auto'); } catch (err) {}
+      img.loading = safeUrl ? (settings.loading || (settings.priority === 'high' ? 'eager' : 'lazy')) : 'lazy';
+      img.src = settings.placeholder || TRANSPARENT_PLACEHOLDER_SRC;
+      try { img.fetchPriority = safeUrl ? (settings.priority || 'auto') : 'low'; } catch (err) {}
+      try {
+        img.style.clipPath = 'inset(0 0 100% 0)';
+        img.style.webkitClipPath = 'inset(0 0 100% 0)';
+        img.style.transform = 'translateY(8px)';
+      } catch (err) {}
 
-      shell.classList.add('blur-up');
       shell.appendChild(img);
       return shell;
     }
@@ -1385,7 +1513,7 @@
       const srcset = img.dataset.lazySrcset || img.dataset.srcset || '';
       const sizes = img.dataset.lazySizes || img.dataset.sizes || '';
       const placeholder = img.dataset.lazyPlaceholder || img.dataset.placeholder || img.dataset.lqip || img.dataset.lazyThumb || '';
-      const mediaKind = img.dataset.mediaKind || (isGifImageUrl(src || srcset) ? 'gif' : 'image');
+      const mediaKind = img.dataset.mediaKind || 'image';
       if (src) registerImageOriginHint(src);
       if (!src && !srcset) return Promise.resolve(false);
       if (img.dataset.loaded === '1') return Promise.resolve(true);
@@ -1398,8 +1526,6 @@
       if (shell) {
         shell.classList.remove('failed');
         shell.classList.add('loading');
-        shell.classList.add('blur-up');
-        if (mediaKind === 'gif') shell.classList.add('is-gif');
       }
 
       const promise = new Promise(function(resolve) {
@@ -1412,7 +1538,18 @@
             shell.classList.toggle('loading', false);
             shell.classList.toggle('loaded', !!success);
             shell.classList.toggle('failed', !success);
-            shell.classList.toggle('blur-up', !success);
+          }
+          if (success) {
+            try {
+              requestAnimationFrame(function() {
+                try {
+                  img.style.clipPath = 'inset(0 0 0 0)';
+                  img.style.webkitClipPath = 'inset(0 0 0 0)';
+                  img.style.opacity = '1';
+                  img.style.transform = 'translateY(0)';
+                } catch (err) {}
+              });
+            } catch (err) {}
           }
           resolve(!!success);
         };
@@ -1421,7 +1558,7 @@
           img.onload = function() {
             if (!finalSourceRequested) return;
             const cachedSource = src || (srcset ? srcset.split(',')[0].trim().split(' ')[0] : '');
-            rememberImageUrlInLocalCache(cachedSource, isGifImageUrl(cachedSource) ? 'gif' : 'image');
+            rememberImageUrlInLocalCache(cachedSource, 'image');
             img.dataset.imageOptimized = '1';
             finish(true);
           };
@@ -1430,9 +1567,9 @@
             finish(false);
           };
           try { img.decoding = 'async'; } catch (err) {}
-          try { img.loading = mediaKind === 'gif' ? 'lazy' : 'eager'; } catch (err) {}
+          try { img.loading = 'eager'; } catch (err) {}
           if ('fetchPriority' in img) {
-            try { img.fetchPriority = mediaKind === 'gif' ? 'low' : (img.fetchPriority || 'auto'); } catch (err) {}
+            try { img.fetchPriority = img.fetchPriority || 'auto'; } catch (err) {}
           }
 
           const commitSource = function() {
@@ -1447,28 +1584,14 @@
               if (src) {
                 img.src = src;
               } else if (srcset && !img.src) {
-                img.src = placeholder || 'data:image/gif;base64,R0lGODlhAQABAAAAACw=';
+                img.src = TRANSPARENT_PLACEHOLDER_SRC;
               }
             } catch (err) {
               finish(false);
             }
           };
 
-          if (placeholder && placeholder !== src) {
-            try {
-              img.src = placeholder;
-              img.dataset.placeholderApplied = '1';
-            } catch (err) {}
-            if (typeof requestAnimationFrame === 'function') {
-              requestAnimationFrame(function() {
-                requestAnimationFrame(commitSource);
-              });
-            } else {
-              setTimeout(commitSource, 16);
-            }
-          } else {
-            commitSource();
-          }
+          commitSource();
         } catch (err) {
           finish(false);
         }
@@ -1478,6 +1601,46 @@
       return promise;
     }
 
+    function enqueueVisibleImageLoad(img) {
+      if (!img) return Promise.resolve(false);
+      if (img.dataset.loaded === '1') return Promise.resolve(true);
+      if (img.dataset.visibleLoadQueued === '1') return img._visibleLoadPromise || Promise.resolve(false);
+
+      img.dataset.visibleLoadQueued = '1';
+
+      const promise = new Promise(function(resolve) {
+        IMAGE_VISIBLE_LOAD_QUEUE.push({ img: img, resolve: resolve });
+        drainVisibleImageLoadQueue();
+      });
+
+      img._visibleLoadPromise = promise;
+      return promise;
+    }
+
+    function drainVisibleImageLoadQueue() {
+      if (imageVisibleLoadActive) return;
+      const next = IMAGE_VISIBLE_LOAD_QUEUE.shift();
+      if (!next || !next.img) return;
+
+      imageVisibleLoadActive = true;
+      const img = next.img;
+
+      loadLazyMediaImage(img).then(function(result) {
+        imageVisibleLoadActive = false;
+        try {
+          img.dataset.visibleLoadQueued = '0';
+        } catch (err) {}
+        next.resolve(!!result);
+        drainVisibleImageLoadQueue();
+      }).catch(function() {
+        imageVisibleLoadActive = false;
+        try {
+          img.dataset.visibleLoadQueued = '0';
+        } catch (err) {}
+        next.resolve(false);
+        drainVisibleImageLoadQueue();
+      });
+    }
 
     function loadLazyImagesInContainer(container) {
       if (!container) return;
@@ -1488,7 +1651,7 @@
         if (genericLazyImageObserver) {
           genericLazyImageObserver.observe(img);
         } else {
-          loadLazyMediaImage(img);
+          enqueueVisibleImageLoad(img);
         }
       });
     }
@@ -1500,23 +1663,21 @@
       const images = Array.from(card.querySelectorAll('.carousel-slide img[data-lazy-src]'));
       if (images.length === 0) return Promise.resolve();
 
-      const firstImage = images[0];
-      const firstLoad = firstImage ? loadLazyMediaImage(firstImage) : Promise.resolve(false);
-      const remainingLoads = images.slice(1).map(function(img, index) {
-        if (!img) return Promise.resolve(false);
-        const delay = isHomeScreenActive() ? (index < 2 ? 0 : 18 * (index - 1)) : 0;
-        return new Promise(function(resolve) {
-          if (delay > 0) {
-            setTimeout(resolve, delay);
-          } else {
-            resolve();
-          }
-        }).then(function() {
-          return loadLazyMediaImage(img);
+      return images.reduce(function(chain, img, index) {
+        return chain.then(function() {
+          if (!img) return false;
+          const delay = index === 0 ? 0 : 35;
+          return new Promise(function(resolve) {
+            if (delay > 0) {
+              setTimeout(resolve, delay);
+            } else {
+              resolve();
+            }
+          }).then(function() {
+            return enqueueVisibleImageLoad(img);
+          });
         });
-      });
-
-      return Promise.all([firstLoad].concat(remainingLoads)).then(function() { return true; });
+      }, Promise.resolve()).then(function() { return true; });
     }
 
     function setupGenericLazyImageObserver() {
@@ -1527,7 +1688,7 @@
 
       if (!supportsIntersectionObserver) {
         document.querySelectorAll('img[data-lazy-src]:not([data-loaded="1"]), img[data-lazy-srcset]:not([data-loaded="1"]), img[data-src]:not([data-loaded="1"]), img[data-srcset]:not([data-loaded="1"])').forEach(function(img) {
-          loadLazyMediaImage(img);
+          enqueueVisibleImageLoad(img);
         });
         scheduleImageRecoveryScan(mainContent, true);
         return;
@@ -1538,12 +1699,12 @@
           if (!entry.isIntersecting) return;
           const img = entry.target;
           genericLazyImageObserver.unobserve(img);
-          loadLazyMediaImage(img);
+          enqueueVisibleImageLoad(img);
         });
       }, {
         root: mainContent,
-        rootMargin: '220px 0px 220px 0px',
-        threshold: 0.01
+        rootMargin: '0px',
+        threshold: 0.2
       });
     }
 
@@ -1574,8 +1735,8 @@
         });
       }, {
         root: mainContent,
-        rootMargin: '140% 0px 140% 0px',
-        threshold: 0.03
+        rootMargin: '0px',
+        threshold: 0.22
       });
 
       document.querySelectorAll('.post-card').forEach(function(card) {
@@ -1599,7 +1760,7 @@
         alt: 'Imagen de la publicación',
         priority: isPrimary ? 'high' : 'low'
       });
-      shell.dataset.imagePriority = isGifImageUrl(url) ? 'low' : (isPrimary ? 'high' : 'low');
+      shell.dataset.imagePriority = isPrimary ? 'high' : 'low';
       const img = shell.querySelector('img');
       try { img.loading = 'eager'; } catch (err) {}
       if (isPrimary && 'fetchPriority' in img) {
@@ -1901,8 +2062,6 @@
             <div class="open-indicator"><i class="fas fa-chevron-right"></i></div>
           </div>
         `;
-
-    const COIN_ICON_URL = 'https://i.ibb.co/PZMv4Sw8/1fa99.gif';
       });
       container.innerHTML = html;
       container.querySelectorAll('.chat-list-item').forEach(function(item) {
@@ -2352,9 +2511,15 @@
       profileRef.on('value', (snapshot) => {
         const data = snapshot.val();
         if (data) {
+          const avatar = sanitizeRenderableImageUrl(data.avatar) || null;
+          if (data.avatar && !avatar) {
+            profileRef.update({ avatar: null }).catch(function(err) {
+              console.warn('No se pudo limpiar el avatar del perfil ' + uid + ':', err);
+            });
+          }
           profileData.name = data.name || 'Usuario';
           profileData.bio = data.bio || '';
-          profileData.avatar = getResolvedProfileAvatar(data);
+          profileData.avatar = avatar;
           profileData.verifiedSticker = data.verifiedSticker || null;
           profileData.likedPosts = data.likedPosts || [];
           profileData.followers = data.followers || {};
@@ -2365,7 +2530,7 @@
           profileData.selectedParticles = data.selectedParticles || null;
           profileData.selectedVerifiedSticker = data.selectedVerifiedSticker || null;
           profileData.rewardedPosts = data.rewardedPosts || {};
-          userProfiles[uid] = { ...data, avatar: getResolvedProfileAvatar(data) };
+          userProfiles[uid] = { ...data, avatar: avatar };
           normalizePostAuthorNames();
           if (document.getElementById('feedContainer')) {
             syncFeedCardsInPlace();
@@ -2402,14 +2567,14 @@
           }
         }
         if (currentUserId) {
-          profileData.avatar = getResolvedProfileAvatar(profileData);
+          profileData.avatar = sanitizeRenderableImageUrl(profileData.avatar) || null;
           if (userProfiles[currentUserId]) {
-            userProfiles[currentUserId] = { ...userProfiles[currentUserId], avatar: getResolvedProfileAvatar(userProfiles[currentUserId]) };
+            userProfiles[currentUserId] = { ...userProfiles[currentUserId], avatar: sanitizeRenderableImageUrl(userProfiles[currentUserId].avatar) || null };
           }
           Object.keys(userProfiles).forEach(function(uid) {
             const user = userProfiles[uid];
             if (user) {
-              userProfiles[uid] = { ...user, avatar: getResolvedProfileAvatar(user) };
+              userProfiles[uid] = { ...user, avatar: sanitizeRenderableImageUrl(user.avatar) || null };
             }
           });
         }
@@ -2647,9 +2812,9 @@
         const thumbImg = document.createElement('img');
         thumbImg.alt = 'Vista previa';
         try { thumbImg.decoding = 'async'; } catch (err) {}
-        try { thumbImg.loading = isGifImageUrl(url) ? 'lazy' : (index === 0 ? 'eager' : 'lazy'); } catch (err) {}
+        try { thumbImg.loading = index === 0 ? 'eager' : 'lazy'; } catch (err) {}
         if ('fetchPriority' in thumbImg) {
-          try { thumbImg.fetchPriority = isGifImageUrl(url) ? 'low' : (index === 0 ? 'high' : 'low'); } catch (err) {}
+          try { thumbImg.fetchPriority = index === 0 ? 'high' : 'low'; } catch (err) {}
         }
         thumbImg.src = url;
         thumb.appendChild(thumbImg);
@@ -3177,6 +3342,10 @@ function createPostCard(post) {
     }
 
     async function uploadImageToImgbb(imageDataUrl, fileName) {
+      if (isGifImageUrl(imageDataUrl)) {
+        throw new Error('Ese formato no está permitido.');
+      }
+
       let lastError = null;
 
       for (let attempt = 1; attempt <= 3; attempt++) {
@@ -3204,6 +3373,10 @@ function createPostCard(post) {
         const loadingMsg = document.querySelector('.upload-progress-msg');
         if (loadingMsg) {
           loadingMsg.textContent = 'Subiendo imagen ' + (i + 1) + ' de ' + imagesData.length + '...';
+        }
+
+        if (isGifImageUrl(imagesData[i])) {
+          continue;
         }
 
         const fileName = 'post_' + Date.now() + '_' + (i + 1) + '.jpg';
@@ -4057,9 +4230,7 @@ function createPostCard(post) {
         const shuffled = shuffleArray([...posts]);
         const sliced = shuffled.slice(0, 10);
         sliced.forEach(post => {
-          let imgSrc = '';
-          if (post.images && post.images.length > 0) imgSrc = post.images[0];
-          else if (post.imageUrl) imgSrc = post.imageUrl;
+          const imgSrc = getPostImageUrls(post)[0] || '';
           results.push({
             id: post.id,
             image: imgSrc,
@@ -4094,7 +4265,7 @@ function buildSearchPostCard(item, postId) {
               ${imageSrc ? `
                 <div class="lazy-media-shell">
                   
-                  <img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" data-lazy-src="${imageSrc}" alt="Preview" loading="eager" decoding="async" />
+                  <img src="${TRANSPARENT_PLACEHOLDER_SRC}" data-lazy-src="${imageSrc}" alt="Preview" loading="eager" decoding="async" />
                 </div>` : `<div class="search-post-placeholder"><i class="fas fa-image"></i></div>`}
             </div>
             <div class="search-post-overlay">
@@ -4210,22 +4381,88 @@ function buildSearchPostCard(item, postId) {
       itemsRef.off();
       itemsRef.on('value', function(snapshot) {
         const data = snapshot.val();
+        const removedIds = [];
         if (data) {
           userShopItems = Object.keys(data).map(function(key) {
             return { id: key, ...data[key] };
+          }).filter(function(item) {
+            if (!item) return false;
+            if (isGifImageUrl(item.imageUrl)) {
+              removedIds.push(item.id);
+              return false;
+            }
+            return true;
           });
         } else {
           userShopItems = [];
         }
+
+        if (removedIds.length > 0) {
+          removedIds.forEach(function(id) {
+            itemsRef.child(id).remove().catch(function(err) {
+              console.warn('No se pudo eliminar el item no permitido ' + id + ':', err);
+            });
+          });
+
+          database.ref('users').once('value').then(function(usersSnapshot) {
+            const usersData = usersSnapshot.val() || {};
+            const updates = {};
+            Object.keys(usersData).forEach(function(uid) {
+              const user = usersData[uid];
+              if (!user || typeof user !== 'object') return;
+
+              const patch = {};
+              let changed = false;
+
+              if (user.avatar && !sanitizeRenderableImageUrl(user.avatar)) {
+                patch.avatar = null;
+                changed = true;
+              }
+
+              if (Array.isArray(user.purchasedItems)) {
+                const filteredPurchased = user.purchasedItems.filter(function(itemId) {
+                  return !removedIds.includes(String(itemId));
+                });
+                if (filteredPurchased.length !== user.purchasedItems.length) {
+                  patch.purchasedItems = filteredPurchased;
+                  changed = true;
+                }
+              }
+
+              ['selectedFrame', 'selectedParticles', 'selectedVerifiedSticker'].forEach(function(field) {
+                if (user[field] && removedIds.includes(String(user[field]))) {
+                  patch[field] = null;
+                  changed = true;
+                }
+              });
+
+              if (changed) {
+                Object.assign(updates, Object.fromEntries(Object.keys(patch).map(function(key) {
+                  return [`users/${uid}/${key}`, patch[key]];
+                })));
+              }
+            });
+
+            if (Object.keys(updates).length > 0) {
+              return database.ref().update(updates);
+            }
+            return null;
+          }).catch(function(err) {
+            console.warn('No se pudieron limpiar los perfiles después de eliminar items no permitidos:', err);
+          });
+        }
+
+        pruneAllLoadedProfilesAgainstShop();
+
         if (currentUserId) {
-          profileData.avatar = getResolvedProfileAvatar(profileData);
+          profileData.avatar = sanitizeRenderableImageUrl(profileData.avatar) || null;
           if (userProfiles[currentUserId]) {
-            userProfiles[currentUserId] = { ...userProfiles[currentUserId], avatar: getResolvedProfileAvatar(userProfiles[currentUserId]) };
+            userProfiles[currentUserId] = { ...userProfiles[currentUserId], avatar: sanitizeRenderableImageUrl(userProfiles[currentUserId].avatar) || null };
           }
           Object.keys(userProfiles).forEach(function(uid) {
             const user = userProfiles[uid];
             if (user) {
-              userProfiles[uid] = { ...user, avatar: getResolvedProfileAvatar(user) };
+              userProfiles[uid] = { ...user, avatar: sanitizeRenderableImageUrl(user.avatar) || null };
             }
           });
         }
@@ -4248,7 +4485,7 @@ function buildSearchPostCard(item, postId) {
         <div class="shop-header">
           <h2><i class="fas fa-store"></i> Tienda</h2>
           <div class="shop-actions">
-            <div class="shop-coins"><img class="coin-icon" src="https://i.ibb.co/PZMv4Sw8/1fa99.gif" alt="Moneda" /><span class="coin-amount">${profileData.coins || 0}</span></div>
+            <div class="shop-coins"><i class="fas fa-coins coin-icon" aria-hidden="true"></i><span class="coin-amount">${profileData.coins || 0}</span></div>
             <button class="shop-upload-btn" id="shopUploadBtn"><i class="fas fa-upload"></i> Subir</button>
           </div>
         </div>
@@ -4271,12 +4508,12 @@ function buildSearchPostCard(item, postId) {
         items.forEach(item => {
           const owned = (profileData.purchasedItems && profileData.purchasedItems.includes(item.id)) || item.ownerId === currentUserId;
           const price = item.price || 0;
-          const iconHtml = item.imageUrl ? `<img src="${item.imageUrl}" alt="Item" />` : `<i class="fas fa-box"></i>`;
+          const iconHtml = sanitizeRenderableImageUrl(item.imageUrl) ? `<img src="${sanitizeRenderableImageUrl(item.imageUrl)}" alt="Item" />` : `<i class="fas fa-box"></i>`;
           html += `
             <div class="shop-item">
               <div class="icon">${iconHtml}</div>
               <button class="buy-btn ${owned ? 'owned-btn' : ''}" data-item-id="${item.id}" data-price="${price}" ${owned ? 'disabled' : ''}>
-                ${owned ? 'Poseído' : `<span class="buy-btn-price"><img class="coin-icon" src="https://i.ibb.co/PZMv4Sw8/1fa99.gif" alt="Moneda" /> ${price}</span><span class="buy-btn-label">Comprar</span>`}
+                ${owned ? 'Poseído' : `<span class="buy-btn-price"><i class="fas fa-coins coin-icon" aria-hidden="true"></i> ${price}</span><span class="buy-btn-label">Comprar</span>`}
               </button>
             </div>
           `;
@@ -4429,9 +4666,23 @@ function buildSearchPostCard(item, postId) {
     uploadImageInput.addEventListener('change', function(e) {
       const file = e.target.files[0];
       if (!file) return;
+      if (file.type === 'image/gif') {
+        alert('Ese formato de imagen no está permitido.');
+        e.target.value = '';
+        uploadImageData = null;
+        uploadImagePreview.innerHTML = '<i class="fas fa-image"></i>';
+        uploadImagePreview.style.backgroundImage = '';
+        return;
+      }
       const reader = new FileReader();
       reader.onload = function(ev) {
         uploadImageData = ev.target.result;
+        if (!sanitizeRenderableImageUrl(uploadImageData)) {
+          alert('Ese formato de imagen no está permitido.');
+          uploadImageData = null;
+          uploadImagePreview.innerHTML = '<i class="fas fa-image"></i>';
+          return;
+        }
         uploadImagePreview.innerHTML = '';
         uploadImagePreview.style.backgroundImage = `url('${uploadImageData}')`;
         uploadImagePreview.style.backgroundSize = 'cover';
@@ -4589,7 +4840,7 @@ function buildSearchPostCard(item, postId) {
           <button class="select-image-btn" id="selectImageBtn">
             <i class="fas fa-plus"></i> Añadir imágenes
           </button>
-          <input type="file" id="createImageInput" accept="image/*" multiple style="display:none;" />
+          <input type="file" id="createImageInput" accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml" multiple style="display:none;" />
         </section>
 
         <div class="create-field">
@@ -4649,7 +4900,7 @@ function buildSearchPostCard(item, postId) {
           item.className = 'create-image-item';
           item.style.backgroundImage = `url('${dataUrl}')`;
           try { item.style.contentVisibility = 'auto'; item.style.containIntrinsicSize = '1px 180px'; } catch (err) {}
-          rememberImageUrlInLocalCache(dataUrl, isGifImageUrl(dataUrl) ? 'gif' : 'image');
+          rememberImageUrlInLocalCache(dataUrl, 'image');
 
           const removeBtn = document.createElement('button');
           removeBtn.className = 'remove-btn';
@@ -4689,14 +4940,26 @@ function buildSearchPostCard(item, postId) {
       });
 
       createImageInput.addEventListener('change', async function(e) {
-        const files = Array.from(e.target.files || []);
-        if (!files.length) return;
+        const files = Array.from(e.target.files || []).filter(function(file) {
+          return file && file.type !== 'image/gif';
+        });
+        if (!files.length) {
+          alert('Ese formato de imagen no está permitido.');
+          e.target.value = '';
+          return;
+        }
 
         try {
           const loadedImages = await Promise.all(files.map(function(file) {
             return readFileAsDataUrl(file);
           }));
-          selectedImagesData = selectedImagesData.concat(loadedImages);
+          const safeImages = loadedImages.filter(function(dataUrl) {
+            return !!sanitizeRenderableImageUrl(dataUrl);
+          });
+          if (safeImages.length !== loadedImages.length) {
+            alert('Se omitieron imágenes no permitidas.');
+          }
+          selectedImagesData = selectedImagesData.concat(safeImages);
           updateImageGrid();
         } catch (err) {
           console.warn('Error al cargar imágenes seleccionadas:', err);
@@ -4752,7 +5015,7 @@ function buildSearchPostCard(item, postId) {
       let avatarContent = '';
       const resolvedAvatar = getResolvedProfileAvatar(userData);
       if (resolvedAvatar) {
-        avatarContent = `<div class="lazy-media-shell" style="border-radius:50%;"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" data-lazy-src="${resolvedAvatar}" alt="Avatar" loading="eager" decoding="async" style="object-fit:cover;border-radius:50%;" /></div>`;
+        avatarContent = `<div class="lazy-media-shell" style="border-radius:50%;"><img src="${TRANSPARENT_PLACEHOLDER_SRC}" data-lazy-src="${resolvedAvatar}" alt="Avatar" loading="eager" decoding="async" style="object-fit:cover;border-radius:50%;" /></div>`;
       } else {
         avatarContent = `<i class="fas fa-user-circle"></i>`;
       }
@@ -4816,14 +5079,12 @@ function buildSearchPostCard(item, postId) {
           <div class="post-grid" id="profilePostGrid">
             ${userPosts.length === 0 ? '<p style="color:#888; text-align:center; grid-column:1/-1;">No hay publicaciones aún</p>' : ''}
             ${userPosts.slice().reverse().map(post => {
-              let imgUrl = '';
-              if (post.images && post.images.length > 0) imgUrl = post.images[0];
-              else if (post.imageUrl) imgUrl = post.imageUrl;
+              const imgUrl = getPostImageUrls(post)[0] || '';
               return `<div class="post-item" data-post-id="${post.id}">
                 ${imgUrl ? `
                   <div class="lazy-media-shell">
                     
-                    <img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" data-lazy-src="${imgUrl}" alt="Miniatura" loading="eager" decoding="async" />
+                    <img src="${TRANSPARENT_PLACEHOLDER_SRC}" data-lazy-src="${imgUrl}" alt="Miniatura" loading="eager" decoding="async" />
                   </div>` : '<i class="fas fa-image"></i>'}
                 ${isOwnProfile ? `<button class="delete-post-btn" data-post-id="${post.id}"><i class="fas fa-trash"></i></button>` : ''}
               </div>`;
@@ -4994,7 +5255,7 @@ function buildSearchPostCard(item, postId) {
         <div class="edit-avatar-section">
           <div class="avatar-preview" id="editAvatarPreview">${avatarPreviewHtml}</div>
           <div class="avatar-hint">Toca la foto para cambiarla</div>
-          <input type="file" id="editAvatarInput" accept="image/*" />
+          <input type="file" id="editAvatarInput" accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml" />
         </div>
         <div class="edit-field">
           <label for="editNameInput">Nombre</label>
@@ -5013,7 +5274,7 @@ function buildSearchPostCard(item, postId) {
             ${frames.length === 0 ? '<div class="edit-item-empty">No tienes marcos comprados.</div>' : ''}
             ${frames.map(item => `
               <div class="edit-item-option ${profileData.selectedFrame === item.id ? 'selected' : ''}" data-item-id="${item.id}" data-category="frame">
-                <div class="preview">${item.imageUrl ? `<img src="${item.imageUrl}" alt="Item" />` : `<i class="fas fa-camera"></i>`}</div>
+                <div class="preview">${sanitizeRenderableImageUrl(item.imageUrl) ? `<img src="${sanitizeRenderableImageUrl(item.imageUrl)}" alt="Item" />` : `<i class="fas fa-camera"></i>`}</div>
                 
                 ${profileData.selectedFrame === item.id ? '<div class="check"><i class="fas fa-check"></i></div>' : ''}
               </div>
@@ -5033,7 +5294,7 @@ function buildSearchPostCard(item, postId) {
             ${particles.length === 0 ? '<div class="edit-item-empty">No tienes partículas compradas.</div>' : ''}
             ${particles.map(item => `
               <div class="edit-item-option ${profileData.selectedParticles === item.id ? 'selected' : ''}" data-item-id="${item.id}" data-category="particles">
-                <div class="preview">${item.imageUrl ? `<img src="${item.imageUrl}" alt="Item" />` : `<i class="fas fa-star"></i>`}</div>
+                <div class="preview">${sanitizeRenderableImageUrl(item.imageUrl) ? `<img src="${sanitizeRenderableImageUrl(item.imageUrl)}" alt="Item" />` : `<i class="fas fa-star"></i>`}</div>
                 
                 ${profileData.selectedParticles === item.id ? '<div class="check"><i class="fas fa-check"></i></div>' : ''}
               </div>
@@ -5053,7 +5314,7 @@ function buildSearchPostCard(item, postId) {
             ${stickers.length === 0 ? '<div class="edit-item-empty">No tienes stickers verificados comprados.</div>' : ''}
             ${stickers.map(item => `
               <div class="edit-item-option ${profileData.selectedVerifiedSticker === item.id ? 'selected' : ''}" data-item-id="${item.id}" data-category="verified">
-                <div class="preview">${item.imageUrl ? `<img src="${item.imageUrl}" alt="Item" />` : `<i class="fas fa-check-circle"></i>`}</div>
+                <div class="preview">${sanitizeRenderableImageUrl(item.imageUrl) ? `<img src="${sanitizeRenderableImageUrl(item.imageUrl)}" alt="Item" />` : `<i class="fas fa-check-circle"></i>`}</div>
                 
                 ${profileData.selectedVerifiedSticker === item.id ? '<div class="check"><i class="fas fa-check"></i></div>' : ''}
               </div>
@@ -5133,9 +5394,19 @@ function buildSearchPostCard(item, postId) {
       fileInput.addEventListener('change', function(e) {
         const file = e.target.files[0];
         if (!file) return;
+        if (file.type === 'image/gif') {
+          alert('Ese formato de imagen no está permitido.');
+          fileInput.value = '';
+          return;
+        }
         const reader = new FileReader();
         reader.onload = function(ev) {
           const dataUrl = ev.target.result;
+          if (!sanitizeRenderableImageUrl(dataUrl)) {
+            alert('Ese formato de imagen no está permitido.');
+            fileInput.value = '';
+            return;
+          }
           avatarPreview.innerHTML = `<img src="${dataUrl}" alt="Avatar" id="editAvatarImg" />`;
           editAvatarPreview = dataUrl;
           editAvatarFile = file;
@@ -5354,7 +5625,9 @@ function buildSearchPostCard(item, postId) {
       fileInput.click();
 
       fileInput.addEventListener('change', function(e) {
-        const files = e.target.files;
+        const files = Array.from(e.target.files || []).filter(function(file) {
+          return file && file.type !== 'image/gif';
+        });
         if (!files || files.length === 0) {
           fileInput.remove();
           return;
