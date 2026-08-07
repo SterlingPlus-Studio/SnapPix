@@ -3008,3 +3008,39 @@ body.comments-open .main-content {
   transition: 0.2s ease;
 }
 .create-header .back-btn:hover { background: #222; }
+
+/* ===== PANTALLA DE INICIO / CARGA ===== */
+.start-overlay-spinner {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  border: 4px solid rgba(255, 255, 255, 0.18);
+  border-top-color: rgba(255, 255, 255, 0.95);
+  animation: snapPixSpin 0.95s linear infinite;
+  margin-bottom: 18px;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.04) inset;
+}
+
+@keyframes snapPixSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.native-loading-shell {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.native-loading-spinner {
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  border: 5px solid rgba(255, 255, 255, 0.16);
+  border-top-color: #fff;
+  animation: snapPixSpin 0.9s linear infinite;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.03) inset;
+}

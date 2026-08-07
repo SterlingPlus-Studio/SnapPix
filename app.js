@@ -69,7 +69,6 @@
       return true;
     }
 
-
     function isGifImageUrl(url) {
       if (!url) return false;
       const value = String(url).trim().toLowerCase();
@@ -399,7 +398,6 @@
       } catch (err) {}
     }
 
-
     const IMAGE_RECOVERY_SCAN_DELAY = 160;
     let imageRecoveryScanTimer = null;
     let imageRecoveryScanBound = false;
@@ -466,6 +464,9 @@
 
       const scheduleFromEvent = function() {
         scheduleImageRecoveryScan(mainContent, false);
+        if (!supportsIntersectionObserver) {
+          scheduleVisibleMediaRefresh(mainContent, false);
+        }
       };
 
       if (mainContent) {
@@ -474,12 +475,58 @@
       window.addEventListener('resize', scheduleFromEvent, { passive: true });
       window.addEventListener('orientationchange', function() {
         scheduleImageRecoveryScan(mainContent, true);
+        if (!supportsIntersectionObserver) {
+          scheduleVisibleMediaRefresh(mainContent, true);
+        }
       });
       document.addEventListener('visibilitychange', function() {
         if (!document.hidden) {
           scheduleImageRecoveryScan(mainContent, true);
+          if (!supportsIntersectionObserver) {
+            scheduleVisibleMediaRefresh(mainContent, true);
+          }
         }
       });
+    }
+
+    const IMAGE_VISIBILITY_REFRESH_DELAY = 120;
+    let imageVisibilityRefreshTimer = null;
+
+    function scheduleVisibleMediaRefresh(root, immediate) {
+      if (!root) return;
+      if (immediate) {
+        refreshVisibleMediaState(root);
+        return;
+      }
+      if (imageVisibilityRefreshTimer) return;
+      imageVisibilityRefreshTimer = setTimeout(function() {
+        imageVisibilityRefreshTimer = null;
+        refreshVisibleMediaState(root);
+      }, IMAGE_VISIBILITY_REFRESH_DELAY);
+    }
+
+    function refreshVisibleMediaState(root) {
+      const scope = root && root.querySelectorAll ? root : document;
+      const images = Array.prototype.slice.call(scope.querySelectorAll('img[data-lazy-src], img[data-lazy-srcset], img[data-src], img[data-srcset]'));
+      images.forEach(function(img) {
+        if (!img) return;
+        if (shouldUnloadLazyMediaImage(img)) {
+          unloadLazyMediaImage(img);
+        } else if (isImageWithinMainViewport(img)) {
+          enqueueVisibleImageLoad(img);
+        }
+      });
+    }
+
+    function isImageWithinMainViewport(img) {
+      if (!img || !mainContent || !mainContent.getBoundingClientRect || !img.getBoundingClientRect) return true;
+      try {
+        const rootRect = mainContent.getBoundingClientRect();
+        const rect = img.getBoundingClientRect();
+        return rect.bottom >= rootRect.top && rect.top <= rootRect.bottom && rect.right >= rootRect.left && rect.left <= rootRect.right;
+      } catch (err) {
+        return true;
+      }
     }
 
     // ============================================================
@@ -1357,12 +1404,12 @@
       }
     }
 
-
     const IMAGE_PRELOAD_CACHE = new Map();
     const IMAGE_PREFETCH_QUEUE = [];
     let imagePrefetchScheduled = false;
     const IMAGE_VISIBLE_LOAD_QUEUE = [];
     let imageVisibleLoadActive = false;
+    let imageVisibleLoadSequence = 0;
 
     function preloadImage(url, priority) {
       if (!url) return Promise.resolve(null);
@@ -1601,15 +1648,87 @@
       return promise;
     }
 
-    function enqueueVisibleImageLoad(img) {
+    
+
+    function estimateLazyImageWeight(img) {
+      if (!img) return Number.POSITIVE_INFINITY;
+      const shell = img.closest('.lazy-media-shell') || img.closest('.carousel-slide') || img.closest('.post-card') || img.parentElement;
+      let area = 240 * 240;
+      try {
+        if (shell && shell.getBoundingClientRect) {
+          const rect = shell.getBoundingClientRect();
+          const width = Math.max(1, rect.width || img.clientWidth || 240);
+          const height = Math.max(1, rect.height || img.clientHeight || 240);
+          area = width * height;
+        }
+      } catch (err) {}
+      let priorityBias = 1;
+      const priority = String(img.dataset.imagePriority || (shell && shell.dataset && shell.dataset.imagePriority) || '').toLowerCase();
+      if (priority === 'high') priorityBias = 0.72;
+      if (priority === 'low') priorityBias = 1.18;
+      let verticalBias = 0;
+      try {
+        const rootRect = mainContent && mainContent.getBoundingClientRect ? mainContent.getBoundingClientRect() : { top: 0 };
+        const rect = shell && shell.getBoundingClientRect ? shell.getBoundingClientRect() : { top: 0 };
+        verticalBias = Math.max(0, rect.top - rootRect.top);
+      } catch (err) {}
+      return (area * priorityBias) + verticalBias;
+    }
+
+    function unloadLazyMediaImage(img) {
+      if (!img) return false;
+      const hasSource = !!(img.dataset.lazySrc || img.dataset.src || img.dataset.lazySrcset || img.dataset.srcset);
+      if (!hasSource) return false;
+
+      const loadToken = String((parseInt(img.dataset.lazyLoadToken || '0', 10) || 0) + 1);
+      img.dataset.lazyLoadToken = loadToken;
+      img.dataset.loading = '0';
+      img.dataset.loaded = '0';
+      img.dataset.visibleLoadQueued = '0';
+      img._lazyLoadPromise = null;
+
+      try {
+        img.onload = null;
+        img.onerror = null;
+        img.removeAttribute('srcset');
+        img.removeAttribute('sizes');
+        img.src = img.dataset.lazyPlaceholder || img.dataset.placeholder || img.dataset.lqip || img.dataset.lazyThumb || TRANSPARENT_PLACEHOLDER_SRC;
+      } catch (err) {}
+
+      const shell = img.closest('.lazy-media-shell') || img.closest('.post-item') || img.closest('.search-post-media') || img.closest('.download-panel .image-item');
+      if (shell && shell.classList) {
+        shell.classList.remove('loading', 'loaded');
+        shell.classList.add('paused');
+      }
+      return true;
+    }
+
+    function shouldUnloadLazyMediaImage(img) {
+      if (!img || img.dataset.loaded !== '1') return false;
+      if (!mainContent || !mainContent.getBoundingClientRect || !img.getBoundingClientRect) return false;
+      try {
+        const rootRect = mainContent.getBoundingClientRect();
+        const rect = img.getBoundingClientRect();
+        return rect.bottom < rootRect.top || rect.top > rootRect.bottom || rect.right < rootRect.left || rect.left > rootRect.right;
+      } catch (err) {
+        return false;
+      }
+    }
+
+        function enqueueVisibleImageLoad(img) {
       if (!img) return Promise.resolve(false);
       if (img.dataset.loaded === '1') return Promise.resolve(true);
       if (img.dataset.visibleLoadQueued === '1') return img._visibleLoadPromise || Promise.resolve(false);
 
       img.dataset.visibleLoadQueued = '1';
+      const weight = estimateLazyImageWeight(img);
 
       const promise = new Promise(function(resolve) {
-        IMAGE_VISIBLE_LOAD_QUEUE.push({ img: img, resolve: resolve });
+        IMAGE_VISIBLE_LOAD_QUEUE.push({ img: img, resolve: resolve, weight: weight, order: ++imageVisibleLoadSequence });
+        IMAGE_VISIBLE_LOAD_QUEUE.sort(function(a, b) {
+          if (a.weight !== b.weight) return a.weight - b.weight;
+          return a.order - b.order;
+        });
         drainVisibleImageLoadQueue();
       });
 
@@ -1617,13 +1736,20 @@
       return promise;
     }
 
-    function drainVisibleImageLoadQueue() {
+        function drainVisibleImageLoadQueue() {
       if (imageVisibleLoadActive) return;
       const next = IMAGE_VISIBLE_LOAD_QUEUE.shift();
       if (!next || !next.img) return;
 
-      imageVisibleLoadActive = true;
       const img = next.img;
+      if (img.dataset.loaded === '1') {
+        try { img.dataset.visibleLoadQueued = '0'; } catch (err) {}
+        next.resolve(true);
+        drainVisibleImageLoadQueue();
+        return;
+      }
+
+      imageVisibleLoadActive = true;
 
       loadLazyMediaImage(img).then(function(result) {
         imageVisibleLoadActive = false;
@@ -1642,7 +1768,7 @@
       });
     }
 
-    function loadLazyImagesInContainer(container) {
+        function loadLazyImagesInContainer(container) {
       if (!container) return;
       const images = container.querySelectorAll('img[data-lazy-src]:not([data-loaded="1"]), img[data-lazy-srcset]:not([data-loaded="1"]), img[data-src]:not([data-loaded="1"]), img[data-srcset]:not([data-loaded="1"])');
       if (!images.length) return;
@@ -1656,12 +1782,15 @@
       });
     }
 
-    function loadPostCardMediaSequentially(card) {
-      if (!card || card.dataset.mediaLoaded === '1') return Promise.resolve();
-      card.dataset.mediaLoaded = '1';
+        function loadPostCardMediaSequentially(card) {
+      if (!card) return Promise.resolve();
 
-      const images = Array.from(card.querySelectorAll('.carousel-slide img[data-lazy-src]'));
+      const images = Array.from(card.querySelectorAll('.carousel-slide img[data-lazy-src], .carousel-slide img[data-lazy-srcset], .carousel-slide img[data-src], .carousel-slide img[data-srcset]'));
       if (images.length === 0) return Promise.resolve();
+
+      images.sort(function(a, b) {
+        return estimateLazyImageWeight(a) - estimateLazyImageWeight(b);
+      });
 
       return images.reduce(function(chain, img, index) {
         return chain.then(function() {
@@ -1680,7 +1809,7 @@
       }, Promise.resolve()).then(function() { return true; });
     }
 
-    function setupGenericLazyImageObserver() {
+        function setupGenericLazyImageObserver() {
       if (genericLazyImageObserver) {
         genericLazyImageObserver.disconnect();
         genericLazyImageObserver = null;
@@ -1696,19 +1825,23 @@
 
       genericLazyImageObserver = new IntersectionObserver(function(entries) {
         entries.forEach(function(entry) {
-          if (!entry.isIntersecting) return;
           const img = entry.target;
-          genericLazyImageObserver.unobserve(img);
-          enqueueVisibleImageLoad(img);
+          if (entry.isIntersecting) {
+            enqueueVisibleImageLoad(img);
+          } else {
+            if (shouldUnloadLazyMediaImage(img)) {
+              unloadLazyMediaImage(img);
+            }
+          }
         });
       }, {
         root: mainContent,
         rootMargin: '0px',
-        threshold: 0.2
+        threshold: 0.01
       });
     }
 
-    function setupPostMediaObserver() {
+        function setupPostMediaObserver() {
       if (postMediaObserver) {
         postMediaObserver.disconnect();
         postMediaObserver = null;
@@ -1728,15 +1861,22 @@
       postMediaObserver = new IntersectionObserver(function(entries) {
         if (!isHomeScreenActive()) return;
         entries.forEach(function(entry) {
-          if (!entry.isIntersecting) return;
           const card = entry.target;
-          postMediaObserver.unobserve(card);
-          loadPostCardMediaSequentially(card);
+          if (entry.isIntersecting) {
+            loadPostCardMediaSequentially(card);
+          } else {
+            const images = card.querySelectorAll('.carousel-slide img[data-lazy-src], .carousel-slide img[data-lazy-srcset], .carousel-slide img[data-src], .carousel-slide img[data-srcset]');
+            images.forEach(function(img) {
+              if (shouldUnloadLazyMediaImage(img)) {
+                unloadLazyMediaImage(img);
+              }
+            });
+          }
         });
       }, {
         root: mainContent,
         rootMargin: '0px',
-        threshold: 0.22
+        threshold: 0.01
       });
 
       document.querySelectorAll('.post-card').forEach(function(card) {
@@ -2973,7 +3113,6 @@ function createPostCard(post) {
 
       let images = getPostImageUrls(post);
 
-
       const carousel = document.createElement('div');
       carousel.className = 'post-image-carousel';
 
@@ -3264,7 +3403,6 @@ function createPostCard(post) {
       document.body.appendChild(uploadStatusOverlay);
     }
 
-
     function extractBase64FromDataUrl(imageDataUrl) {
       if (typeof imageDataUrl !== 'string') return '';
       const commaIndex = imageDataUrl.indexOf(',');
@@ -3455,7 +3593,6 @@ function createPostCard(post) {
 
       return candidates;
     }
-
 
     function resetMusicPreview() {
       if (musicPreviewButton) {
