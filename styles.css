@@ -228,14 +228,12 @@ body.feed-mode-visible .feed-mode-switcher { display: inline-flex; }
   display: flex;
   flex-direction: column;
   background: #000;
-  overflow-y: auto;
-  scroll-snap-type: y mandatory;
-  scroll-behavior: auto;
-  -webkit-overflow-scrolling: auto;
   height: 100%;
   position: relative;
-  scroll-padding-top: 0px;
+  overflow: hidden; /* Evita scroll global, cada vista maneja el suyo */
 }
+
+/* ===== FEED CONTAINER (scroll propio) ===== */
 .feed-container {
   width: 100%;
   max-width: 600px;
@@ -245,6 +243,12 @@ body.feed-mode-visible .feed-mode-switcher { display: inline-flex; }
   gap: 0;
   padding: 0;
   background: #000;
+  height: 100%;
+  overflow-y: auto;
+  scroll-snap-type: y mandatory;
+  scroll-behavior: auto;
+  -webkit-overflow-scrolling: auto;
+  scroll-padding-top: 0px;
 }
 
 /* ===== POST CARD ===== */
@@ -376,22 +380,12 @@ body.top-bar-hidden .post-card {
   pointer-events: none;
   max-width: 70%;
 }
-.post-description {
-  font-size: 16px;
-  line-height: 1.5;
-  text-shadow: 0 2px 8px rgba(0,0,0,0.9);
-  pointer-events: auto;
-  word-wrap: break-word;
-  max-height: 40vh;
-  overflow-y: auto;
-  color: #fff;
-}
 .post-author-name {
   font-size: 14px;
   font-weight: 700;
   line-height: 1.25;
   color: #fff;
-  margin-bottom: 4px;
+  margin-bottom: 2px; /* Reducido para acercar a la descripción */
   text-shadow: 0 2px 8px rgba(0,0,0,0.9);
   word-break: break-word;
 }
@@ -401,7 +395,7 @@ body.top-bar-hidden .post-card {
   gap: 6px;
   flex-wrap: wrap;
   max-width: 100%;
-  margin-bottom: 4px;
+  margin-bottom: 2px; /* Reducido para acercar */
 }
 .post-author-name-text {
   min-width: 0;
@@ -429,6 +423,20 @@ body.top-bar-hidden .post-card {
   background: transparent;
   border: none;
   box-shadow: none;
+}
+.post-description {
+  font-size: 16px;
+  line-height: 1.5;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.9);
+  pointer-events: auto;
+  word-wrap: break-word;
+  max-height: 40vh;
+  overflow-y: auto;
+  color: #fff;
+  margin-top: 0; /* Aseguramos que no haya margen superior */
+}
+.post-description p {
+  margin: 0; /* Reset para párrafos dentro */
 }
 .post-particle-effect-layer {
   position: absolute;
@@ -493,6 +501,32 @@ body.top-bar-hidden .post-card {
   text-align: center;
   margin-top: 1px;
   letter-spacing: 0.1px;
+}
+.post-actions-right .post-music-cover {
+  width: 38px;
+  height: 38px;
+  margin-top: 4px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid rgba(255, 255, 255, 0.42);
+  background: linear-gradient(145deg, rgba(96, 165, 250, 0.3), rgba(168, 85, 247, 0.28));
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: spin 6s linear infinite;
+  flex-shrink: 0;
+  pointer-events: auto;
+}
+.post-actions-right .post-music-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.post-actions-right .post-music-cover--fallback i {
+  font-size: 16px;
+  color: #fff;
 }
 .post-actions-right .action-btn.liked { color: #ef4444; }
 .post-actions-right .action-btn.liked i { transform: scale(1.1); }
@@ -571,96 +605,205 @@ body.top-bar-hidden .post-card {
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ========================================= */
-/* ===== SEARCH (REDISEÑO MINIMALISTA) ===== */
+/* ===== VISTAS CON SCROLL INDEPENDIENTE ===== */
 /* ========================================= */
-.search-view {
-  flex: 1;
-  width: 100%;
-  background: #000;
-  padding: 0 14px 22px;
-  overflow-y: auto;
-  display: none;
-  animation: fadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-.search-view::-webkit-scrollbar { display: none; }
-.search-view.active { display: block; }
-
 .search-view,
-.messages-view,
 .login-view,
 .profile-view,
 .edit-profile-view,
+.create-post-view,
+.shop-view {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  display: none;
+  background: #000;
+  animation: fadeIn 0.3s ease;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.search-view::-webkit-scrollbar,
+.login-view::-webkit-scrollbar,
+.profile-view::-webkit-scrollbar,
+.edit-profile-view::-webkit-scrollbar,
+.create-post-view::-webkit-scrollbar,
+.shop-view::-webkit-scrollbar {
+  display: none;
+}
+
+/* Vistas activas (excepto messages-view que es especial) */
+.search-view.active,
+.login-view.active,
+.profile-view.active,
+.edit-profile-view.active,
+.create-post-view.active,
+.shop-view.active {
+  display: block;
+}
+
+/* ===== MENSAJES (vista especial, siempre visible por defecto) ===== */
+.messages-view {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  display: block; /* Siempre visible por defecto */
+  background: #000;
+  animation: fadeIn 0.3s ease;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding: 0 0 16px;
+  color: #eee;
+}
+.messages-view::-webkit-scrollbar {
+  display: none;
+}
+
+/* Ocultar mensajes cuando otra vista está activa */
+.main-content .search-view.active ~ .messages-view,
+.main-content .profile-view.active ~ .messages-view,
+.main-content .edit-profile-view.active ~ .messages-view,
+.main-content .create-post-view.active ~ .messages-view,
+.main-content .shop-view.active ~ .messages-view,
+.main-content .login-view.active ~ .messages-view {
+  display: none;
+}
+
+/* Paddings específicos de cada vista */
+.search-view {
+  padding: 0 14px 22px;
+}
+.login-view {
+  padding: 40px 24px;
+  display: flex; /* login necesita flex para centrar, pero display: none por defecto, se activa con .active */
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.login-view.active {
+  display: flex;
+}
+.profile-view {
+  padding: 44px 20px 30px; /* Aumentado el padding-top para separar del borde superior */
+}
+.edit-profile-view {
+  padding: 20px 20px 30px;
+}
 .create-post-view {
-  content-visibility: auto;
-  contain-intrinsic-size: 1px 900px;
+  padding: 0 14px 34px;
+}
+.shop-view {
+  padding: 0 0 20px;
 }
 
-.post-card,
-.search-result-item,
-.comment-item,
-.messages-list .chat-list-item,
-.music-picker-item,
-.download-panel .image-item {
-  contain: layout paint style;
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-/* Cabecera del buscador moderna con Glassmorphism */
+/* ========================================= */
+/* ===== SEARCH (REDISEÑO MINIMALISTA) ===== */
+/* ========================================= */
 .search-header {
   position: sticky;
   top: 0;
-  z-index: 10;
+  z-index: 30;
   display: flex;
   align-items: center;
   gap: 12px;
-  margin: 0 -14px 16px;
-  padding: 16px 14px;
-  background: rgba(0, 0, 0, 0.85);
+  margin: 0 -14px 8px;
+  padding: 8px 14px 10px;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.98) 0%, rgba(0, 0, 0, 0.86) 100%);
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
 }
 .search-header .back-btn {
-  width: 42px;
-  height: 42px;
+  width: 40px;
+  height: 40px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: transparent;
-  border: none;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.04);
   border-radius: 50%;
   font-size: 20px;
-  color: #a1a1aa;
+  color: #c4c4d1;
   cursor: pointer;
   padding: 0;
   transition: all 0.2s ease;
 }
 .search-header .back-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.09);
   color: #fff;
 }
 .search-header .back-btn:active { transform: scale(0.92); }
 
-.search-header input {
+.search-input-shell {
   flex: 1;
   min-width: 0;
-  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+  height: 44px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 30px;
-  font-size: 15px;
-  background: rgba(255, 255, 255, 0.03);
-  color: #fff;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
   transition: all 0.25s ease;
+}
+.search-input-shell i {
+  color: #7dd3fc;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+.search-input-shell:focus-within {
+  border-color: rgba(96, 165, 250, 0.55);
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow: 0 8px 22px rgba(96, 165, 250, 0.12);
+}
+.search-input-shell input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  height: 100%;
+  border: none;
+  outline: none;
+  font-size: 15px;
+  background: transparent;
+  color: #fff;
   font-weight: 500;
 }
-.search-header input:focus {
-  border-color: rgba(96, 165, 250, 0.5);
-  background: rgba(255, 255, 255, 0.06);
-  box-shadow: 0 4px 20px rgba(96, 165, 250, 0.1);
+.search-input-shell input::placeholder { color: #71717a; font-weight: 400; }
+
+.search-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2px 12px;
+  margin-top: 0;
 }
-.search-header input::placeholder { color: #71717a; font-weight: 400; }
+.search-meta-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: rgba(96, 165, 250, 0.12);
+  border: 1px solid rgba(96, 165, 250, 0.18);
+  color: #cfe8ff;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
 
 /* Grid estilo Masonry limpio */
 .search-results {
@@ -758,6 +901,46 @@ body.top-bar-hidden .post-card {
 .search-result-item .info {
   display: none;
 }
+
+.search-empty {
+  min-height: 240px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: #a1a1aa;
+  text-align: center;
+  padding: 24px 14px;
+}
+.search-empty i {
+  font-size: 28px;
+  color: #60a5fa;
+}
+.search-empty p {
+  font-size: 14px;
+  line-height: 1.4;
+  max-width: 260px;
+}
+
+.search-result-item {
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.28);
+}
+.search-result-item .search-post-overlay {
+  padding-top: 28px;
+}
+.search-result-item .search-post-tag {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 5px 8px;
+  border-radius: 999px;
+  margin-top: 8px;
+  background: rgba(96, 165, 250, 0.14);
+  border: 1px solid rgba(96, 165, 250, 0.14);
+  color: #93c5fd;
+}
+
 
 @media (max-width: 420px) {
   .search-header {
@@ -1193,16 +1376,7 @@ body.comments-open .main-content {
 }
 
 /* ===== MENSAJES (VISTA INTEGRADA) ===== */
-.messages-view {
-  flex: 1;
-  width: 100%;
-  background: #000;
-  padding: 0 0 16px;
-  overflow-y: auto;
-  display: block;
-  animation: fadeIn 0.3s ease;
-  color: #eee;
-}
+/* Los estilos de messages-view están arriba en la sección de vistas */
 .messages-header {
   display: flex;
   align-items: center;
@@ -1626,16 +1800,7 @@ body.comments-open .main-content {
 
 /* ===== LOGIN / REGISTER ===== */
 .login-view {
-  flex: 1;
-  width: 100%;
-  background: #000;
-  padding: 40px 24px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  animation: fadeIn 0.3s ease;
-  color: #eee;
+  /* ya tiene padding y flex */
 }
 .login-view .logo { font-size: 48px; color: #3b82f6; margin-bottom: 8px; }
 .login-view h1 { font-size: 28px; font-weight: 700; color: #fff; margin-bottom: 4px; }
@@ -1677,26 +1842,9 @@ body.comments-open .main-content {
 .login-view p span:hover { text-decoration: underline; }
 
 /* ===== PROFILE ===== */
-.profile-view,
-.edit-profile-view,
-.create-post-view {
-  flex: 1;
-  width: 100%;
-  background: #000;
-  padding: 24px 20px 30px;
-  overflow-y: auto;
-  border-radius: 0;
-  border: none;
-  box-shadow: none;
-  display: none;
-  animation: fadeIn 0.3s ease;
-  color: #eee;
+.profile-view {
+  /* padding ya definido: 44px 20px 30px */
 }
-.profile-view.active,
-.edit-profile-view.active,
-.create-post-view.active { display: block; }
-@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-
 .profile-header {
   display: flex;
   flex-direction: column;
@@ -1842,7 +1990,18 @@ body.comments-open .main-content {
   font-size: 32px;
 }
 .profile-posts { margin-top: 8px; }
-.profile-posts h4 { font-size: 16px; color: #fff; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+.profile-posts h4 {
+  font-size: 16px;
+  color: #fff;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+/* OCULTAR EL ICONO DE CUADRÍCULA EN "MIS PUBLICACIONES" */
+.profile-posts h4 i {
+  display: none !important;
+}
 .profile-posts .post-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -1971,16 +2130,8 @@ body.comments-open .main-content {
 
 /* ===== TIENDA ===== */
 .shop-view {
-  flex: 1;
-  width: 100%;
-  background: #000;
-  padding: 0 0 20px;
-  overflow-y: auto;
-  display: none;
-  animation: fadeIn 0.3s ease;
-  color: #eee;
+  /* padding ya definido */
 }
-.shop-view.active { display: block; }
 .shop-header {
   position: sticky;
   top: 0;
@@ -2865,14 +3016,20 @@ body.comments-open .main-content {
   body.top-bar-hidden .post-card { height: calc(100dvh - 70px); max-height: calc(100dvh - 70px); }
   .post-bottom-left { bottom: 12px; left: 12px; right: 70px; max-width: 75%; }
   .post-author-name { font-size: 13px; margin-bottom: 3px; }
-  .post-description { font-size: 14px; max-height: 30vh; }
+  .post-author-name-row { margin-bottom: 2px; }
+  .post-description { font-size: 14px; max-height: 30vh; margin-top: 0; }
   .post-actions-right { right: 6px; bottom: 90px; gap: 14px; }
   .post-actions-right .action-btn i { font-size: 24px; }
   .post-actions-right .action-btn span { font-size: 11px; }
   .post-profile-avatar { width: 40px; height: 40px; font-size: 18px; }
   .profile-avatar, .edit-avatar-section .avatar-preview { width: 80px; height: 80px; font-size: 36px; }
   .profile-name { font-size: 20px; }
-  .profile-view, .edit-profile-view, .create-post-view, .search-view, .login-view { padding: 16px 12px 24px; }
+  .profile-view { padding: 32px 12px 24px; }
+  .edit-profile-view { padding: 16px 12px 24px; }
+  .create-post-view { padding: 0 12px 24px; }
+  .search-view { padding: 0 12px 16px; }
+  .login-view { padding: 30px 16px; }
+  .shop-view { padding: 0 0 16px; }
   .edit-header h2, .create-header h2 { font-size: 18px; }
   .edit-header .save-btn, .create-header .publish-btn { font-size: 13px; padding: 6px 16px; }
   .profile-stats { max-width: 240px; }
@@ -2892,8 +3049,8 @@ body.comments-open .main-content {
 }
 @media (max-width: 360px) {
   .post-bottom-left { right: 60px; max-width: 70%; bottom: 10px; }
-  .post-author-name { font-size: 12px; margin-bottom: 3px; }
-  .post-description { font-size: 13px; }
+  .post-author-name { font-size: 12px; margin-bottom: 2px; }
+  .post-description { font-size: 13px; margin-top: 0; }
   .post-actions-right { right: 4px; gap: 12px; bottom: 80px; }
   .post-actions-right .action-btn i { font-size: 20px; }
   .post-actions-right .action-btn span { font-size: 10px; }
@@ -2973,10 +3130,7 @@ body.comments-open .main-content {
 
 /* ===== NUEVA PUBLICACIÓN — REDISEÑO COMPLETO ===== */
 .create-post-view {
-  padding: 0 14px 34px;
-  background: #000;
-  overflow-y: auto;
-  scrollbar-width: none;
+  /* padding ya definido */
 }
 .create-post-view::-webkit-scrollbar { display: none; }
 

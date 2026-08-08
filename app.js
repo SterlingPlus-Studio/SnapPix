@@ -556,7 +556,7 @@
     let editOriginalSelectedFrame = null;
     const VERIFIED_STICKER_OPTIONS = [
       'https://i.ibb.co/Y7Y2pffJ/facebook-verificado.png',
-      'https://i.ibb.co/TDzF8B6f/1784763007641.png'
+      'https://i.ibb.co/3ymgbjWk/fba73c0a-e6b4-4ff4-845a-efc9ebf2ed84.png'
     ];
 
     function getShopItemById(itemId) {
@@ -1210,12 +1210,14 @@
           stopAllMusic();
         }
         body.classList.toggle('feed-mode-visible', activeScreen === 'home');
+        mainContent.classList.toggle('search-screen-active', activeScreen === 'search');
         if (feedModeSwitcher) {
           feedModeSwitcher.classList.toggle('hidden', activeScreen !== 'home');
         }
       } else {
         activeScreen = screen || 'home';
         body.classList.toggle('feed-mode-visible', activeScreen === 'home');
+        mainContent.classList.toggle('search-screen-active', activeScreen === 'search');
         if (feedModeSwitcher) {
           feedModeSwitcher.classList.toggle('hidden', activeScreen !== 'home');
         }
@@ -3236,6 +3238,7 @@ function createPostCard(post) {
           <i class="fi fi-br-arrow-alt-circle-down"></i>
           <span class="download-count">${getPostDownloadUserCount(post)}</span>
         </button>
+        ${getPostMusicArtworkMarkup(post)}
       `;
 
       postCard.appendChild(bottomLeft);
@@ -3592,6 +3595,56 @@ function createPostCard(post) {
       }
 
       return candidates;
+    }
+
+    function getPostMusicData(post) {
+      if (!post) return null;
+
+      const musicUrl = String(post.musicUrl || '').trim();
+      const musicTitle = String(post.musicTitle || '').trim();
+      if (!musicUrl && !musicTitle) return null;
+
+      const normalizedUrl = musicUrl.toLowerCase();
+      const normalizedTitle = musicTitle.toLowerCase();
+
+      const matched = Array.isArray(musicList)
+        ? musicList.find(function(item) {
+            if (!item) return false;
+            const itemUrl = String(item.value || '').trim().toLowerCase();
+            const itemLabel = String(item.label || '').trim().toLowerCase();
+            return (normalizedUrl && itemUrl === normalizedUrl) || (normalizedTitle && itemLabel === normalizedTitle);
+          })
+        : null;
+
+      return matched || {
+        value: musicUrl,
+        label: musicTitle || 'Música',
+        icon: ''
+      };
+    }
+
+    function getPostMusicArtworkMarkup(post) {
+      const musicItem = getPostMusicData(post);
+      if (!musicItem) return '';
+
+      const candidates = getMusicIconCandidates(musicItem);
+      const altText = escapeHtml((musicItem.label || post.musicTitle || 'Música').trim() || 'Música');
+      const titleText = escapeHtml((musicItem.label || post.musicTitle || 'Música').trim() || 'Música');
+      const imageUrl = candidates.length > 0 ? candidates[0] : '';
+
+      if (imageUrl) {
+        return `
+          <div class="post-music-cover" title="${titleText}" aria-label="${titleText}">
+            <img src="${imageUrl}" alt="${altText}" loading="lazy" decoding="async" />
+          </div>
+        `;
+      }
+
+      return `
+        <div class="post-music-cover post-music-cover--fallback" title="${titleText}" aria-label="${titleText}">
+          <i class="fas fa-music"></i>
+        </div>
+      `;
     }
 
     function resetMusicPreview() {
@@ -4352,12 +4405,21 @@ function createPostCard(post) {
       container.innerHTML = `
         <div class="search-header">
           <button class="back-btn" id="searchBackBtn"><i class="fas fa-arrow-left"></i></button>
-          <input type="text" id="searchInput" placeholder="Buscar publicaciones..." />
+          <div class="search-input-shell">
+            <i class="fi fi-rr-search"></i>
+            <input type="text" id="searchInput" placeholder="Buscar publicaciones, música o texto..." />
+          </div>
+        </div>
+        <div class="search-meta">
+          <span class="search-meta-chip" id="searchResultCount">0 resultados</span>
         </div>
         <div class="search-results" id="searchResults"></div>
       `;
 
       mainContent.appendChild(container);
+      requestAnimationFrame(function() {
+        mainContent.scrollTop = 0;
+      });
 
       const searchInput = document.getElementById('searchInput');
       const searchResults = document.getElementById('searchResults');
@@ -4417,9 +4479,14 @@ function buildSearchPostCard(item, postId) {
 
         if (!searchResults) return;
         searchResults.className = 'search-results';
+        const searchCountEl = document.getElementById('searchResultCount');
+        const normalizedQuery = (query || '').trim().toLowerCase();
 
-        if (query.length === 0) {
+        if (normalizedQuery.length === 0) {
           const suggestions = getRandomSuggestions();
+          if (searchCountEl) {
+            searchCountEl.textContent = suggestions.length + ' sugerencias';
+          }
           if (suggestions.length === 0) {
             searchResults.innerHTML = `
               <div class="search-empty">
@@ -4448,8 +4515,14 @@ function buildSearchPostCard(item, postId) {
 
         const results = posts.filter(post => {
           const desc = (post.description || '').toLowerCase();
-          return desc.includes(query.toLowerCase());
+          const music = (post.musicTitle || post.music || '').toLowerCase();
+          const author = (post.authorName || '').toLowerCase();
+          return desc.includes(normalizedQuery) || music.includes(normalizedQuery) || author.includes(normalizedQuery);
         });
+
+        if (searchCountEl) {
+          searchCountEl.textContent = results.length + (results.length === 1 ? ' resultado' : ' resultados');
+        }
 
         if (results.length === 0) {
           searchResults.innerHTML = `
@@ -5441,7 +5514,7 @@ function buildSearchPostCard(item, postId) {
 
         <!-- Stickers verificados (comprados en tienda) -->
         <div class="edit-items-section">
-          <div class="section-title"><i class="fas fa-check-circle"></i> Stickers verificados</div>
+          <div class="section-title"><i class="fas fa-check-circle"></i> Stickers de verificado de la tienda </div>
           <div class="edit-items-scroll" id="editVerifiedScroll">
             <div class="edit-item-option ${!profileData.selectedVerifiedSticker ? 'selected' : ''}" data-item-id="none" data-category="verified">
               <div class="preview"><i class="fas fa-ban" style="font-size:32px; color:#666;"></i></div>
@@ -5461,7 +5534,7 @@ function buildSearchPostCard(item, postId) {
 
         <!-- Stickers clásicos (los 3 por defecto) -->
         <div class="edit-items-section">
-          <div class="section-title"><i class="fas fa-certificate"></i> Stickers clásicos</div>
+          <div class="section-title"><i class="fas fa-certificate"></i> Stickers Verificado Oficial</div>
           <div class="edit-items-scroll" id="editClassicScroll">
             <div class="edit-item-option ${!profileData.verifiedSticker ? 'selected' : ''}" data-sticker-url="none" data-category="classic">
               <div class="preview"><i class="fas fa-ban" style="font-size:32px; color:#666;"></i></div>
