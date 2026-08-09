@@ -57,9 +57,9 @@
       if (shouldReduceAggressivePrefetch()) return 1;
       const connection = getConnectionInfo();
       const effectiveType = String(connection && connection.effectiveType || '').toLowerCase();
-      if (effectiveType.indexOf('4g') !== -1) return 3;
-      if (effectiveType.indexOf('3g') !== -1) return 2;
-      return 2;
+      if (effectiveType.indexOf('4g') !== -1) return 5;
+      if (effectiveType.indexOf('3g') !== -1) return 3;
+      return 3;
     }
 
     function getAdaptiveImageObserverMargin() {
@@ -1836,35 +1836,36 @@
     }
 
         function drainVisibleImageLoadQueue() {
-      if (imageVisibleLoadActive) return;
-      const next = IMAGE_VISIBLE_LOAD_QUEUE.shift();
-      if (!next || !next.img) return;
+      const concurrency = getAdaptiveImagePrefetchConcurrency();
 
-      const img = next.img;
-      if (img.dataset.loaded === '1') {
-        try { img.dataset.visibleLoadQueued = '0'; } catch (err) {}
-        next.resolve(true);
-        drainVisibleImageLoadQueue();
-        return;
+      while (imageVisibleLoadActiveCount < concurrency) {
+        const next = IMAGE_VISIBLE_LOAD_QUEUE.shift();
+        if (!next || !next.img) return;
+
+        const img = next.img;
+        if (img.dataset.loaded === '1') {
+          try { img.dataset.visibleLoadQueued = '0'; } catch (err) {}
+          next.resolve(true);
+          continue;
+        }
+
+        imageVisibleLoadActiveCount++;
+
+        loadLazyMediaImage(img).then(function(result) {
+          try {
+            img.dataset.visibleLoadQueued = '0';
+          } catch (err) {}
+          next.resolve(!!result);
+        }).catch(function() {
+          try {
+            img.dataset.visibleLoadQueued = '0';
+          } catch (err) {}
+          next.resolve(false);
+        }).finally(function() {
+          imageVisibleLoadActiveCount = Math.max(0, imageVisibleLoadActiveCount - 1);
+          drainVisibleImageLoadQueue();
+        });
       }
-
-      imageVisibleLoadActive = true;
-
-      loadLazyMediaImage(img).then(function(result) {
-        imageVisibleLoadActive = false;
-        try {
-          img.dataset.visibleLoadQueued = '0';
-        } catch (err) {}
-        next.resolve(!!result);
-        drainVisibleImageLoadQueue();
-      }).catch(function() {
-        imageVisibleLoadActive = false;
-        try {
-          img.dataset.visibleLoadQueued = '0';
-        } catch (err) {}
-        next.resolve(false);
-        drainVisibleImageLoadQueue();
-      });
     }
 
         function loadLazyImagesInContainer(container) {
@@ -1891,28 +1892,24 @@
         return estimateLazyImageWeight(a) - estimateLazyImageWeight(b);
       });
 
-      return images.reduce(function(chain, img, index) {
-        return chain.then(function() {
-          if (!img) return false;
-          const delay = index === 0 ? 0 : (shouldReduceAggressivePrefetch() ? 55 : 24);
-          return new Promise(function(resolve) {
-            if (delay > 0) {
-              setTimeout(resolve, delay);
-            } else {
-              resolve();
-            }
-          }).then(function() {
-            const nextImg = images[index + 1];
-            if (nextImg) {
-              const nextUrl = nextImg.dataset.lazySrc || nextImg.dataset.src || '';
-              if (nextUrl && !isGifImageUrl(nextUrl)) {
-                queueImagePrefetch(nextUrl, index === 0 ? 'high' : 'low');
-              }
-            }
-            return enqueueVisibleImageLoad(img);
-          });
-        });
-      }, Promise.resolve()).then(function() { return true; });
+      // The first visible/primary image gets high priority; the remaining
+      // carousel images enter the shared concurrent queue instead of waiting
+      // for the previous image to finish.
+      images.forEach(function(img, index) {
+        if (!img) return;
+        const url = img.dataset.lazySrc || img.dataset.src || '';
+        if (url && !isGifImageUrl(url)) {
+          registerImageOriginHint(url);
+          if (index < 2) {
+            queueImagePrefetch(url, 'high');
+          } else if (!shouldReduceAggressivePrefetch()) {
+            queueImagePrefetch(url, 'low');
+          }
+        }
+        enqueueVisibleImageLoad(img);
+      });
+
+      return Promise.resolve(true);
     }
 
         function setupGenericLazyImageObserver() {
