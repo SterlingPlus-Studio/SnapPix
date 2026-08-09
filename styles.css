@@ -315,6 +315,8 @@ body.top-bar-hidden .post-card {
   position: relative;
   z-index: 1;
   background: #000;
+  backface-visibility: hidden;
+  transform-origin: center center;
 }
 .carousel-slide.loaded img {
   opacity: 1;
@@ -326,7 +328,9 @@ body.top-bar-hidden .post-card {
   height: 100%;
   overflow: hidden;
   background: transparent;
-  contain: paint;
+  contain: layout paint size;
+  content-visibility: auto;
+  contain-intrinsic-size: 1px 320px;
 }
 .lazy-media-shell img {
   width: 100%;

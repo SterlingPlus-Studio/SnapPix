@@ -1,88 +1,3 @@
-    function drainVisibleImageLoadQueue() {
-      const concurrency = getAdaptiveImagePrefetchConcurrency();
-
-      while (imageVisibleLoadActiveCount < concurrency) {
-        const next = IMAGE_VISIBLE_LOAD_QUEUE.shift();
-        if (!next || !next.img) return;
-
-        const img = next.img;
-        if (img.dataset.loaded === '1') {
-          try { img.dataset.visibleLoadQueued = '0'; } catch (err) {}
-          next.resolve(true);
-          continue;
-        }
-
-        imageVisibleLoadActiveCount += 1;
-        imageVisibleLoadActive = imageVisibleLoadActiveCount > 0;
-
-        loadLazyMediaImage(img).then(function(result) {
-          imageVisibleLoadActiveCount = Math.max(0, imageVisibleLoadActiveCount - 1);
-          imageVisibleLoadActive = imageVisibleLoadActiveCount > 0;
-          try {
-            img.dataset.visibleLoadQueued = '0';
-          } catch (err) {}
-          next.resolve(!!result);
-          drainVisibleImageLoadQueue();
-        }).catch(function() {
-          imageVisibleLoadActiveCount = Math.max(0, imageVisibleLoadActiveCount - 1);
-          imageVisibleLoadActive = imageVisibleLoadActiveCount > 0;
-          try {
-            img.dataset.visibleLoadQueued = '0';
-          } catch (err) {}
-          next.resolve(false);
-          drainVisibleImageLoadQueue();
-        });
-      }
-    }
-    function shouldUnloadLazyMediaImage(img) {
-      if (!img || img.dataset.loaded !== '1') return false;
-      if (!mainContent || !mainContent.getBoundingClientRect || !img.getBoundingClientRect) return false;
-      try {
-        const rootRect = mainContent.getBoundingClientRect();
-        const rect = img.getBoundingClientRect();
-        const buffer = shouldReduceAggressivePrefetch() ? 240 : 900;
-        return rect.bottom < (rootRect.top - buffer) || rect.top > (rootRect.bottom + buffer) || rect.right < (rootRect.left - buffer) || rect.left > (rootRect.right + buffer);
-      } catch (err) {
-        return false;
-      }
-    }
-    function shouldReduceAggressivePrefetch() {
-      const connection = getConnectionInfo();
-      if (!connection) return false;
-      const effectiveType = String(connection.effectiveType || '').toLowerCase();
-      return !!connection.saveData || effectiveType.indexOf('2g') !== -1 || effectiveType.indexOf('slow-2g') !== -1;
-    }
-
-    function getAdaptiveImagePrefetchConcurrency() {
-      if (shouldReduceAggressivePrefetch()) return 1;
-      const connection = getConnectionInfo();
-      const effectiveType = String(connection && connection.effectiveType || '').toLowerCase();
-      if (effectiveType.indexOf('4g') !== -1) return 5;
-      if (effectiveType.indexOf('3g') !== -1) return 3;
-      return 3;
-    }
-
-    function getAdaptiveImageObserverMargin() {
-      if (shouldReduceAggressivePrefetch()) return '320px 0px 520px 0px';
-      const connection = getConnectionInfo();
-      const effectiveType = String(connection && connection.effectiveType || '').toLowerCase();
-      if (effectiveType.indexOf('4g') !== -1) return '1400px 0px 1800px 0px';
-      if (effectiveType.indexOf('3g') !== -1) return '900px 0px 1200px 0px';
-      return '1100px 0px 1500px 0px';
-    }
-
-    function isImageNearMainViewport(img, extraMarginPx) {
-      if (!img || !mainContent || !mainContent.getBoundingClientRect || !img.getBoundingClientRect) return true;
-      const margin = Number(extraMarginPx);
-      const padding = Number.isFinite(margin) ? Math.max(0, margin) : (shouldReduceAggressivePrefetch() ? 320 : 900);
-      try {
-        const rootRect = mainContent.getBoundingClientRect();
-        const rect = img.getBoundingClientRect();
-        return rect.bottom >= (rootRect.top - padding) && rect.top <= (rootRect.bottom + padding) && rect.right >= (rootRect.left - padding) && rect.left <= (rootRect.right + padding);
-      } catch (err) {
-        return true;
-      }
-    }
 // ============================================================
     //  CONFIGURACIÓN
     // ============================================================
@@ -375,6 +290,18 @@
         dns.href = origin;
         document.head.appendChild(dns);
       } catch (err) {}
+    }
+
+    function queueImageBatchPrefetch(urls, priority) {
+      if (!Array.isArray(urls) || urls.length === 0) return;
+      const seen = Object.create(null);
+      urls.forEach(function(url) {
+        const safeUrl = sanitizeRenderableImageUrl(url);
+        if (!safeUrl || seen[safeUrl]) return;
+        seen[safeUrl] = true;
+        registerImageOriginHint(safeUrl);
+        queueImagePrefetch(safeUrl, priority || 'low');
+      });
     }
 
     function isOptimizableImageElement(img) {
@@ -760,13 +687,25 @@
 
     function getPostImageUrls(post) {
       if (!post) return [];
+      const urls = [];
+      const seen = Object.create(null);
+
+      function pushUrl(url) {
+        const safeUrl = sanitizeRenderableImageUrl(url);
+        if (!safeUrl || seen[safeUrl]) return;
+        seen[safeUrl] = true;
+        urls.push(safeUrl);
+      }
+
       if (post.images && Array.isArray(post.images) && post.images.length > 0) {
-        return post.images.filter(function(url) { return !!sanitizeRenderableImageUrl(url); });
+        post.images.forEach(function(url) {
+          pushUrl(url);
+        });
+      } else if (post.imageUrl) {
+        pushUrl(post.imageUrl);
       }
-      if (post.imageUrl) {
-        return sanitizeRenderableImageUrl(post.imageUrl) ? [post.imageUrl] : [];
-      }
-      return [];
+
+      return urls;
     }
 
     function getDownloadTrackerId() {
@@ -1496,7 +1435,6 @@
     let imagePrefetchScheduled = false;
     const IMAGE_VISIBLE_LOAD_QUEUE = [];
     let imageVisibleLoadActive = false;
-    let imageVisibleLoadActiveCount = 0;
     let imageVisibleLoadSequence = 0;
 
     function preloadImage(url, priority) {
@@ -1556,6 +1494,12 @@
       if (shouldReduceAggressivePrefetch() && !isHighPriority) return;
       if (isGifImageUrl(normalizedUrl)) return;
 
+      for (var i = 0; i < IMAGE_PREFETCH_QUEUE.length; i++) {
+        if (IMAGE_PREFETCH_QUEUE[i] && IMAGE_PREFETCH_QUEUE[i].url === normalizedUrl) {
+          return;
+        }
+      }
+
       IMAGE_PREFETCH_QUEUE.push({ url: normalizedUrl, priority: isHighPriority ? 'high' : 'low' });
       if (imagePrefetchScheduled) return;
       imagePrefetchScheduled = true;
@@ -1584,25 +1528,23 @@
 
     function warmUpPostImages(postList) {
       const source = Array.isArray(postList) ? postList : [];
-      const limited = source.slice(0, shouldReduceAggressivePrefetch() ? 1 : 3);
+      const urls = [];
+      const seen = Object.create(null);
 
-      limited.forEach(function(post, postIndex) {
+      source.slice(0, 6).forEach(function(post, index) {
         const images = getPostImageUrls(post);
         if (!images.length) return;
-
-        images.slice(0, shouldReduceAggressivePrefetch() ? 1 : 2).forEach(function(url, imageIndex) {
-          if (!url) return;
-          registerImageOriginHint(url);
-
-          if (postIndex === 0 && imageIndex === 0) {
-            queueImagePrefetch(url, 'high');
-            return;
-          }
-
-          if (!shouldReduceAggressivePrefetch() || wasImageSeenLocally(url)) {
-            queueImagePrefetch(url, 'low');
-          }
+        images.slice(0, index === 0 ? 2 : 1).forEach(function(url) {
+          const safeUrl = sanitizeRenderableImageUrl(url);
+          if (!safeUrl || seen[safeUrl]) return;
+          seen[safeUrl] = true;
+          urls.push(safeUrl);
         });
+      });
+
+      urls.slice(0, 4).forEach(function(url, index) {
+        registerImageOriginHint(url);
+        queueImagePrefetch(url, index === 0 ? 'high' : 'low');
       });
     }
 
@@ -1661,6 +1603,12 @@
       const placeholder = img.dataset.lazyPlaceholder || img.dataset.placeholder || img.dataset.lqip || img.dataset.lazyThumb || '';
       const mediaKind = img.dataset.mediaKind || 'image';
       if (src) registerImageOriginHint(src);
+      if (srcset) {
+        const firstCandidate = srcset.split(',')[0];
+        if (firstCandidate) {
+          registerImageOriginHint(firstCandidate.trim().split(' ')[0]);
+        }
+      }
       if (!src && !srcset) return Promise.resolve(false);
       if (img.dataset.loaded === '1') return Promise.resolve(true);
       if (img.dataset.loading === '1') {
@@ -1836,36 +1784,35 @@
     }
 
         function drainVisibleImageLoadQueue() {
-      const concurrency = getAdaptiveImagePrefetchConcurrency();
+      if (imageVisibleLoadActive) return;
+      const next = IMAGE_VISIBLE_LOAD_QUEUE.shift();
+      if (!next || !next.img) return;
 
-      while (imageVisibleLoadActiveCount < concurrency) {
-        const next = IMAGE_VISIBLE_LOAD_QUEUE.shift();
-        if (!next || !next.img) return;
-
-        const img = next.img;
-        if (img.dataset.loaded === '1') {
-          try { img.dataset.visibleLoadQueued = '0'; } catch (err) {}
-          next.resolve(true);
-          continue;
-        }
-
-        imageVisibleLoadActiveCount++;
-
-        loadLazyMediaImage(img).then(function(result) {
-          try {
-            img.dataset.visibleLoadQueued = '0';
-          } catch (err) {}
-          next.resolve(!!result);
-        }).catch(function() {
-          try {
-            img.dataset.visibleLoadQueued = '0';
-          } catch (err) {}
-          next.resolve(false);
-        }).finally(function() {
-          imageVisibleLoadActiveCount = Math.max(0, imageVisibleLoadActiveCount - 1);
-          drainVisibleImageLoadQueue();
-        });
+      const img = next.img;
+      if (img.dataset.loaded === '1') {
+        try { img.dataset.visibleLoadQueued = '0'; } catch (err) {}
+        next.resolve(true);
+        drainVisibleImageLoadQueue();
+        return;
       }
+
+      imageVisibleLoadActive = true;
+
+      loadLazyMediaImage(img).then(function(result) {
+        imageVisibleLoadActive = false;
+        try {
+          img.dataset.visibleLoadQueued = '0';
+        } catch (err) {}
+        next.resolve(!!result);
+        drainVisibleImageLoadQueue();
+      }).catch(function() {
+        imageVisibleLoadActive = false;
+        try {
+          img.dataset.visibleLoadQueued = '0';
+        } catch (err) {}
+        next.resolve(false);
+        drainVisibleImageLoadQueue();
+      });
     }
 
         function loadLazyImagesInContainer(container) {
@@ -1892,24 +1839,21 @@
         return estimateLazyImageWeight(a) - estimateLazyImageWeight(b);
       });
 
-      // The first visible/primary image gets high priority; the remaining
-      // carousel images enter the shared concurrent queue instead of waiting
-      // for the previous image to finish.
-      images.forEach(function(img, index) {
-        if (!img) return;
-        const url = img.dataset.lazySrc || img.dataset.src || '';
-        if (url && !isGifImageUrl(url)) {
-          registerImageOriginHint(url);
-          if (index < 2) {
-            queueImagePrefetch(url, 'high');
-          } else if (!shouldReduceAggressivePrefetch()) {
-            queueImagePrefetch(url, 'low');
-          }
-        }
-        enqueueVisibleImageLoad(img);
-      });
-
-      return Promise.resolve(true);
+      return images.reduce(function(chain, img, index) {
+        return chain.then(function() {
+          if (!img) return false;
+          const delay = index === 0 ? 0 : 35;
+          return new Promise(function(resolve) {
+            if (delay > 0) {
+              setTimeout(resolve, delay);
+            } else {
+              resolve();
+            }
+          }).then(function() {
+            return enqueueVisibleImageLoad(img);
+          });
+        });
+      }, Promise.resolve()).then(function() { return true; });
     }
 
         function setupGenericLazyImageObserver() {
@@ -1939,8 +1883,8 @@
         });
       }, {
         root: mainContent,
-        rootMargin: getAdaptiveImageObserverMargin(),
-        threshold: 0.001
+        rootMargin: '0px',
+        threshold: 0.01
       });
     }
 
@@ -1978,8 +1922,8 @@
         });
       }, {
         root: mainContent,
-        rootMargin: getAdaptiveImageObserverMargin(),
-        threshold: 0.001
+        rootMargin: '0px',
+        threshold: 0.01
       });
 
       document.querySelectorAll('.post-card').forEach(function(card) {
