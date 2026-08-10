@@ -1951,72 +1951,178 @@
         const auth = firebase.auth();
         const db = firebase.database();
 
-        // ==================== LISTA DE MÚSICA ====================
-        const MUSIC_LIST = [
-            { "title": "5:20am", "file": "https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Musica/5%2020am.m4a",
-                "icon": "https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Icono/5%2020am.png" },
-            { "title": "Immortals", "file": "https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Musica/Immortals.mp3",
-                "icon": "https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Icono/Immortals.png" },
-            { "title": "Hola Señorita",
-                "file": "https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Musica/Hola%20Se%C3%B1orita.mp3",
-                "icon": "https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Icono/Hola%20Se%C3%B1orita.png" },
-            { "title": "La Playa", "file": "https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Musica/La%20Playa.mp3",
-                "icon": "https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Icono/La%20Playa.png" },
-            { "title": "ela giro", "file": "https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Musica/ela%20giro.mp3",
-                "icon": "https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Icono/ela%20giro.png" },
-            { "title": "montagem game",
-                "file": "https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Musica/montagem%20game.mp3",
-                "icon": "https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Icono/montagem%20game.png" },
-            { "title": "Montero", "file": "https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Musica/Montero.mp3",
-                "icon": "https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Icono/Montero.png" },
-            { "title": "Matadora", "file": "https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Musica/Matadora.mp3",
-                "icon": "https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Icono/Matadora.png" },
-            { "title": "Bang", "file": "https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Musica/Bang.mp3",
-                "icon": "https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Icono/Bang.png" },
-            { "title": "montagem direção",
-                "file": "https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Musica/montagem%20dire%C3%A7%C3%A3o.mp3",
-                "icon": "https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Icono/montagem%20dire%C3%A7%C3%A3o.png" },
-            { "title": "Puta Mexicana",
-                "file": "https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Musica/Puta%20Mexicana.mp3",
-                "icon": "https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Icono/Puta%20Mexicana.png" },
-            { "title": "Bailando", "file": "https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Musica/Bailando.mp3",
-                "icon": "https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Icono/Bailando.png" },
-            { "title": "Ransom", "file": "https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Musica/Ransom.mp3",
-                "icon": "https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Icono/Ransom.png" },
-            { "title": "Allo Allo",
-                "file": "https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Musica/Allo%20Allo.mp3",
-                "icon": "https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Icono/Allo%20Allo.png" },
-            { "title": "Olha a Explosão",
-                "file": "https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Musica/Olha%20a%20Explos%C3%A3o.mp3",
-                "icon": "https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Icono/Olha%20a%20Explos%C3%A3o.png" },
-            { "title": "Ebrio", "file": "https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Musica/Ebrio.mp3",
-                "icon": "https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Icono/Ebrio.png" },
-            { "title": "Con Altura",
-                "file": "https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Musica/Con%20Altura.mp3",
-                "icon": "https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Icono/Con%20Altura.png" },
-            { "title": "Montagem", "file": "https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Musica/MONTAGEM.mp3",
-                "icon": "https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Icono/Montagem.png" },
-            { "title": "Ma Meilleure Ennemie",
-                "file": "https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Musica/Ma%20Meilleure%20Ennemie.mp3",
-                "icon": "https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Icono/Ma%20Meilleure%20Ennemie.png" },
-            { "title": "Name Back Jumpstyle",
-                "file": "https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Musica/Name%20Back%20Jumpstyle.mp3",
-                "icon": "https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Icono/Name%20Back%20Jumpstyle.png" },
-            { "title": "Raindance X Let Me Love You",
-                "file": "https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Musica/Raindance%20X%20Let%20Me%20Love%20You.mp3",
-                "icon": "https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Icono/Raindance%20X%20Let%20Me%20Love%20You.png" },
-            { "title": "Don t Copy My Flow",
-                "file": "https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Musica/Don%20t%20Copy%20My%20Flow.mp3",
-                "icon": "https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Icono/Don%20t%20Copy%20My%20Flow.png" },
-            { "title": "Melodia Cavalgada",
-                "file": "https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Musica/MELODIACAVALGADA.mp3",
-                "icon": "https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Icono/melodiacavalgada.png" },
-            { "title": "Bounce Savage",
-                "file": "https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Musica/BounceSavage.mp3",
-                "icon": "https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Icono/BounceSavage.png" },
-            { "title": "Nootfunk", "file": "https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Musica/NOOTFUNK.mp3",
-                "icon": "https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Icono/nootfunk.png" }
-        ];
+        // ==================== LISTA DE MÚSICA DESDE RAW ====================
+        const MUSIC_LIST_SOURCE_URL = 'https://raw.githubusercontent.com/SterlingPlus-Studio/Musica/main/Data.json';
+        const DEFAULT_MUSIC_ICON = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96">
+                <defs>
+                    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0%" stop-color="#ff2d55"/>
+                        <stop offset="100%" stop-color="#7a2cff"/>
+                    </linearGradient>
+                </defs>
+                <circle cx="48" cy="48" r="44" fill="url(#g)"/>
+                <circle cx="48" cy="48" r="22" fill="#111" opacity="0.92"/>
+                <circle cx="48" cy="48" r="7" fill="#fff"/>
+                <path d="M56 24v28.4a9 9 0 1 1-4-7.4V30l18-4v16.4a9 9 0 1 1-4-7.4V24z" fill="#fff"/>
+            </svg>
+        `);
+
+        let MUSIC_LIST = [];
+        let musicListPromise = null;
+
+        function normalizeMusicKey(value = '') {
+            return String(value)
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '');
+        }
+
+        function deriveMusicTitleFromUrl(url, index = 0) {
+            try {
+                const safeUrl = String(url || '');
+                const filePart = safeUrl.split('?')[0].split('#')[0].split('/').pop() || '';
+                const withoutExt = filePart.replace(/\.[^.]+$/, '');
+                const cleaned = decodeURIComponent(withoutExt)
+                    .replace(/[_-]+/g, ' ')
+                    .replace(/\s+/g, ' ')
+                    .trim();
+                return cleaned || `Música ${index + 1}`;
+            } catch (err) {
+                return `Música ${index + 1}`;
+            }
+        }
+
+        function normalizeMusicItem(item, index = 0) {
+            if (typeof item === 'string') {
+                const file = item.trim();
+                if (!file) return null;
+                return {
+                    title: deriveMusicTitleFromUrl(file, index),
+                    file,
+                    icon: DEFAULT_MUSIC_ICON,
+                };
+            }
+
+            if (!item || typeof item !== 'object') return null;
+
+            const file = String(
+                item.file || item.url || item.src || item.audio || item.musicFile || item.link || item.path || ''
+            ).trim();
+
+            if (!file) return null;
+
+            const title = String(item.title || item.name || item.nombre || '').trim() || deriveMusicTitleFromUrl(file, index);
+            const icon = String(item.icon || item.image || item.cover || item.artwork || item.thumbnail || '').trim() || DEFAULT_MUSIC_ICON;
+
+            return { title, file, icon };
+        }
+
+        function extractMusicList(payload) {
+            const arraysToInspect = [];
+
+            if (Array.isArray(payload)) {
+                arraysToInspect.push(payload);
+            } else if (payload && typeof payload === 'object') {
+                const maybeArrays = [
+                    payload.data,
+                    payload.music,
+                    payload.musics,
+                    payload.songs,
+                    payload.items,
+                    payload.tracks,
+                    payload.playlist,
+                ];
+                maybeArrays.forEach((value) => {
+                    if (Array.isArray(value)) arraysToInspect.push(value);
+                });
+
+                if (Array.isArray(payload.data?.music)) arraysToInspect.push(payload.data.music);
+                if (Array.isArray(payload.data?.songs)) arraysToInspect.push(payload.data.songs);
+                if (Array.isArray(payload.data?.items)) arraysToInspect.push(payload.data.items);
+                if (Array.isArray(payload.data?.tracks)) arraysToInspect.push(payload.data.tracks);
+            }
+
+            const source = arraysToInspect.find((arr) => Array.isArray(arr) && arr.length > 0) || arraysToInspect[0] || [];
+            const normalized = source.map((item, index) => normalizeMusicItem(item, index)).filter(Boolean);
+
+            if (normalized.length) return normalized;
+
+            if (payload && typeof payload === 'object') {
+                const singleCandidate = normalizeMusicItem(payload, 0);
+                if (singleCandidate) return [singleCandidate];
+            }
+
+            return [];
+        }
+
+        async function loadMusicLibrary() {
+            if (musicListPromise) return musicListPromise;
+
+            musicListPromise = (async () => {
+                try {
+                    const response = await fetch(MUSIC_LIST_SOURCE_URL, { cache: 'no-store' });
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+
+                    const payload = await response.json();
+                    const musicList = extractMusicList(payload);
+                    MUSIC_LIST = musicList.length ? musicList : [];
+                    return MUSIC_LIST;
+                } catch (err) {
+                    console.error('No se pudo cargar la música desde RAW:', err);
+                    MUSIC_LIST = [];
+                    musicListPromise = null;
+                    return MUSIC_LIST;
+                }
+            })();
+
+            return musicListPromise;
+        }
+
+        async function ensureMusicLibraryLoaded() {
+            if (MUSIC_LIST.length > 0) return MUSIC_LIST;
+            return loadMusicLibrary();
+        }
+
+        function findMusicByTitle(title) {
+            const key = normalizeMusicKey(title);
+            if (!key) return null;
+            return MUSIC_LIST.find((music) => normalizeMusicKey(music.title) === key) || null;
+        }
+
+        function getRandomMusic() {
+            if (!MUSIC_LIST.length) {
+                return {
+                    title: 'Música',
+                    file: '',
+                    icon: DEFAULT_MUSIC_ICON,
+                };
+            }
+            return MUSIC_LIST[Math.floor(Math.random() * MUSIC_LIST.length)];
+        }
+
+        function resolveMusicForPost(post) {
+            const existingFile = String(post?.musicFile || '').trim();
+            const existingTitle = String(post?.musicTitle || '').trim();
+            const existingCover = String(post?.musicCover || '').trim();
+
+            if (existingFile) {
+                const matched = MUSIC_LIST.find((music) => music.file === existingFile) || null;
+                return {
+                    title: existingTitle || matched?.title || deriveMusicTitleFromUrl(existingFile, 0),
+                    file: existingFile,
+                    icon: existingCover || matched?.icon || DEFAULT_MUSIC_ICON,
+                };
+            }
+
+            const byTitle = findMusicByTitle(existingTitle);
+            if (byTitle) return byTitle;
+
+            return getRandomMusic();
+        }
 
         // ==================== ESTADO GLOBAL ====================
         const state = {
@@ -2284,6 +2390,13 @@
         }
 
         function getRandomMusic() {
+            if (!MUSIC_LIST.length) {
+                return {
+                    title: 'Música',
+                    file: '',
+                    icon: DEFAULT_MUSIC_ICON,
+                };
+            }
             return MUSIC_LIST[Math.floor(Math.random() * MUSIC_LIST.length)];
         }
 
@@ -2536,6 +2649,8 @@
 
         // Cargar posts del feed desde Firebase (sin límite para que todos estén disponibles)
         async function loadFeed() {
+            await ensureMusicLibraryLoaded();
+
             const snapshot = await db.ref('posts').orderByKey().once('value');
             const postsData = snapshot.val();
             const postsArray = [];
@@ -2580,23 +2695,10 @@
                     post.user = fallbackUser;
                 }
 
-                if (!post.musicTitle) {
-                    const randomMusic = getRandomMusic();
-                    post.musicTitle = randomMusic.title;
-                    post.musicCover = randomMusic.icon;
-                    post.musicFile = randomMusic.file;
-                } else {
-                    const found = MUSIC_LIST.find(m => m.title === post.musicTitle);
-                    if (found) {
-                        post.musicCover = found.icon;
-                        post.musicFile = found.file;
-                    } else {
-                        const randomMusic = getRandomMusic();
-                        post.musicTitle = randomMusic.title;
-                        post.musicCover = randomMusic.icon;
-                        post.musicFile = randomMusic.file;
-                    }
-                }
+                const resolvedMusic = resolveMusicForPost(post);
+                post.musicTitle = resolvedMusic.title;
+                post.musicCover = resolvedMusic.icon;
+                post.musicFile = resolvedMusic.file;
                 post.musicTrack = post.musicTitle;
                 post.likes = post.likes || 0;
                 post.commentCount = post.comments ? post.comments.length : 0;
@@ -3245,7 +3347,8 @@
         let previewAudio = new Audio();
         previewAudio.loop = false;
 
-        function openUploadModal() {
+        async function openUploadModal() {
+            await ensureMusicLibraryLoaded();
             document.getElementById('upload-modal').classList.remove('hidden');
             resetUploadModal();
             renderMusicPicker();
@@ -3293,6 +3396,18 @@
 
         function renderMusicPicker() {
             const grid = document.getElementById('music-picker-grid');
+            if (!MUSIC_LIST.length) {
+                grid.innerHTML = `
+                    <div class="music-option selected" style="grid-column: 1 / -1; cursor: default;">
+                        <div class="music-opt-icon">
+                            <span style="color:#fff;font-size:1rem;font-weight:700;">♪</span>
+                        </div>
+                        <div class="music-opt-name">Cargando...</div>
+                    </div>
+                `;
+                return;
+            }
+
             grid.innerHTML = MUSIC_LIST.map((music, idx) => `
                     <div class="music-option" data-music-index="${idx}" data-music-title="${escapeHTML(music.title)}">
                         <div class="music-opt-icon">
@@ -3599,6 +3714,7 @@
 
         // ==================== INICIO ====================
         async function init() {
+            await ensureMusicLibraryLoaded();
             auth.onAuthStateChanged(async (user) => {
                 if (user) {
                     state.currentUser = user;
