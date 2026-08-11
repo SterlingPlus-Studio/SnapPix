@@ -1,43 +1,48 @@
-# SnapPix 🎬
+# SnapPix 📸
 
-**SnapPix** es una plataforma de video corto en formato vertical diseñada para la creación, descubrimiento y distribución algorítmica de contenido multimedia en tiempo real.
+**SnapPix** es una aplicación web estilo TikTok orientada exclusivamente a la publicación, descubrimiento e interacción con **fotografías e imágenes** mediante un feed vertical de desplazamiento continuo. 
+
+Desarrollada totalmente con el stack web estándar (HTML5, CSS3 y JavaScript vanilla) e integrada con **Firebase** para el backend Serverless.
 
 ---
 
 ## ⚡ Características Principales
 
-* **Feed Infinito (Para Ti):** Recomendación algorítmica basada en señales de interacción inmediata (tiempo de visualización, likes, compartidos).
-* **Editor de Contenido:** Carga de video, herramientas de corte, superposición de audio/música y aplicación de filtros.
-* **Social Hub:** Sistema de likes, comentarios en hilo, guardados, duetos y compartido multiplataforma.
-* **Streaming de Baja Latencia:** Reproducción fluida optimizada mediante segmentación HLS / DASH y compresión adaptable.
-* **Perfil de Creador:** Panel con estadísticas de rendimiento, métricas de retención y gestión de seguidores.
+* **Feed Vertical Infinito:** Navegación a pantalla completa mediante `scroll-snap` optimizada para dispositivos móviles y escritorio.
+* **Carga de Imágenes:** Subida rápida de archivos locales guardados e indexados directamente en la nube.
+* **Autenticación de Usuarios:** Registro e inicio de sesión seguro (Email/Password o Google) a través de Firebase Auth.
+* **Interacción en Tiempo Real:** Sistema de likes, guardados y contador de vistas almacenados al instante.
+* **Perfil de Usuario:** Galería personal con el historial de publicaciones subidas por el creador.
 
 ---
 
 ## 🛠️ Stack Tecnológico
 
-| Capa | Tecnología |
+| Componente | Tecnología |
 | :--- | :--- |
-| **Mobile App** | React Native / Flutter |
-| **Backend API** | Node.js (NestJS) / Go |
-| **Video Processing** | FFmpeg / AWS Elemental MediaConvert |
-| **Base de Datos** | PostgreSQL (Persistencia) + Redis (Feed Cache) |
-| **Almacenamiento / CDN** | AWS S3 + Cloudflare CDN |
+| **Estructura** | HTML5 Semántico |
+| **Estilos** | CSS3 (Flexbox, Grid, CSS Scroll Snap, Variables CSS) |
+| **Lógica / Frontend** | JavaScript Vanilla (ES6+ Modules) |
+| **Base de Datos** | Cloud Firestore (Tiempo real) |
+| **Almacenamiento** | Firebase Storage (Imágenes) |
+| **Autenticación** | Firebase Authentication |
+| **Hosting** | Firebase Hosting |
 
 ---
 
-## 🚀 Instalación y Configuración
+## 📁 Estructura del Proyecto
 
-```bash
-# 1. Clonar el repositorio
-git clone [https://github.com/tu-usuario/snappix.git](https://github.com/tu-usuario/snappix.git)
-cd snappix
-
-# 2. Instalar dependencias
-npm install
-
-# 3. Configurar variables de entorno
-cp .env.example .env
-
-# 4. Iniciar en entorno de desarrollo
-npm run dev
+```text
+snappix/
+├── index.html            # Pantalla principal (Feed)
+├── profile.html          # Vista de perfil del usuario
+├── upload.html           # Interfaz para subida de imágenes
+├── css/
+│   ├── main.css          # Estilos globales y layout vertical
+│   └── components.css    # Estilos de botones, cards e interacciones
+├── js/
+│   ├── firebase-config.js # Credenciales e inicialización de Firebase
+│   ├── auth.js           # Gestión de sesiones y registro
+│   ├── feed.js           # Renderizado dinámico del feed y scroll
+│   └── upload.js         # Subida de imágenes a Firebase Storage
+└── assets/               # Íconos y recursos estáticos
