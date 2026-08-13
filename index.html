@@ -112,6 +112,83 @@
             }
         }
 
+        /* ==================== ALERTA DE DONACIÓN ==================== */
+        #donation-alert {
+            position: absolute;
+            inset: 0;
+            z-index: 300;
+            background: rgba(0, 0, 0, 0.88);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            animation: fadeIn 0.4s ease;
+        }
+        #donation-alert.show {
+            display: flex;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.96); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        #donation-alert .donation-box {
+            background: var(--surface);
+            border-radius: 24px;
+            padding: 30px 24px;
+            max-width: 360px;
+            width: 100%;
+            border: 1px solid var(--border);
+            text-align: center;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.7);
+        }
+        #donation-alert .donation-box h2 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--accent);
+            margin-bottom: 12px;
+        }
+        #donation-alert .donation-box p {
+            color: #ddd;
+            font-size: 0.95rem;
+            line-height: 1.5;
+            margin-bottom: 20px;
+        }
+        #donation-alert .donation-box p strong {
+            color: #fff;
+        }
+        #donation-alert .donation-box .donation-btns {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        #donation-alert .donation-box .donation-btns a,
+        #donation-alert .donation-box .donation-btns button {
+            padding: 10px 24px;
+            border-radius: 30px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-decoration: none;
+            border: none;
+            cursor: pointer;
+            transition: transform 0.15s;
+            font-family: var(--font-family);
+        }
+        #donation-alert .donation-box .donation-btns a:active,
+        #donation-alert .donation-box .donation-btns button:active {
+            transform: scale(0.94);
+        }
+        #donation-alert .donation-box .donation-btns .btn-donate {
+            background: var(--accent);
+            color: #fff;
+        }
+        #donation-alert .donation-box .donation-btns .btn-continue {
+            background: #444;
+            color: #fff;
+        }
+
         /* ==================== VISTAS ==================== */
         .view {
             position: absolute;
@@ -1747,6 +1824,22 @@
             <p>Cargando...</p>
         </div>
 
+        <!-- ==================== ALERTA DE DONACIÓN ==================== -->
+        <div id="donation-alert">
+            <div class="donation-box">
+                <h2>⚠️ Aviso importante</h2>
+                <p>
+                    El desarrollador ya no tiene fondos para mantener los servidores.<br>
+                    La aplicación cerrará en <strong>2 semanas</strong>.<br><br>
+                    Si deseas apoyar el desarrollo, puedes hacer una donación a través de PayPal.
+                </p>
+                <div class="donation-btns">
+                    <a href="https://www.paypal.me/SterlingStudio342" target="_blank" class="btn-donate">Donar ahora</a>
+                    <button id="donation-close-btn" class="btn-continue">Continuar</button>
+                </div>
+            </div>
+        </div>
+
         <!-- ==================== AUTH VIEW ==================== -->
         <div class="view hidden" id="auth-view">
             <div class="auth-card" id="auth-card">
@@ -2445,12 +2538,32 @@
 
         let loadingHideTimer = null;
 
+        // ==================== ALERTA DE DONACIÓN ====================
+        let donationAlertShown = false;
+
+        function showDonationAlert() {
+            if (donationAlertShown) return;
+            const el = document.getElementById('donation-alert');
+            el.classList.add('show');
+            donationAlertShown = true;
+        }
+
+        function hideDonationAlert() {
+            document.getElementById('donation-alert').classList.remove('show');
+        }
+
+        // Evento para el botón continuar
+        document.getElementById('donation-close-btn').addEventListener('click', hideDonationAlert);
+
+        // ==================== OCULTAR CARGA ====================
         function hideLoading() {
             state.loading = false;
             loadingView.classList.add('hidden');
             clearTimeout(loadingHideTimer);
             loadingHideTimer = setTimeout(() => {
                 if (loadingView) loadingView.style.display = 'none';
+                // Mostrar la alerta de donación después de ocultar el loading
+                showDonationAlert();
             }, 140);
         }
 
@@ -2458,17 +2571,12 @@
         function userHasVerifiedBadge(uid, totalLikes) {
             if (!uid) return false;
             if (totalLikes !== undefined) return totalLikes >= 100;
-            // Si no se pasa totalLikes, calcular a partir de state.posts o state.userPosts
             let sum = 0;
             state.posts.forEach(p => {
                 if (p.authorUid === uid) sum += (p.likes || 0);
             });
-            // Si el uid es el del perfil que estamos viendo en el perfil, podría estar en userPosts
             if (state.viewingProfile && state.viewingProfile.uid === uid) {
-                // Ya tenemos los posts en userPosts cargados
-                state.userPosts.forEach(p => {
-                    // sumar solo si no se contaron ya (pero state.posts ya tiene todos)
-                });
+                // ya está cubierto
             }
             return sum >= 100;
         }
@@ -2794,7 +2902,6 @@
 
             const info = document.createElement('div');
             info.className = 'post-info';
-            // Calculamos total de likes para el badge
             let totalLikes = 0;
             state.posts.forEach(p => { if (p.authorUid === post.authorUid) totalLikes += (p.likes || 0); });
             const showBadge = userHasVerifiedBadge(post.authorUid, totalLikes);
@@ -3120,7 +3227,6 @@
                         state.likedPosts = new Set();
                         state.myProfile = { uid: '', name: '', username: '', bio: '', avatar: '', followers: 0,
                             following: 0, totalLikes: 0 };
-                state.userCache = {};
                         state.userCache = {};
                         feedContainer.innerHTML = '';
                         showAuth();
