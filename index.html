@@ -389,23 +389,6 @@
             height: 22px;
             border-radius: 4px;
         }
-        .top-bar .search-btn {
-            background: none;
-            border: none;
-            cursor: default;
-            color: #fff;
-            padding: 4px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            opacity: 0.6;
-        }
-        .top-bar .search-btn svg {
-            width: 24px;
-            height: 24px;
-            stroke: #fff;
-            stroke-width: 2.2;
-        }
 
         #feed-view .feed-tabs-wrap {
             position: absolute;
@@ -464,8 +447,39 @@
             height: 100%;
             overscroll-behavior-y: contain;
             scrollbar-width: none;
+            position: relative;
         }
         .feed-container::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* ===== INDICADOR DE CARGA DEL FEED ===== */
+        .feed-loading {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg);
+            z-index: 20;
+            pointer-events: none;
+        }
+        .feed-loading .loader {
+            width: 40px;
+            height: 40px;
+            border: 4px solid var(--surface2);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        .feed-loading p {
+            margin-top: 14px;
+            color: #888;
+            font-size: 0.9rem;
+            font-family: var(--font-family);
+        }
+        .feed-loading.hidden {
             display: none;
         }
 
@@ -995,6 +1009,12 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
+        }
+
+        /* Optimización de carga de miniaturas del perfil */
+        #profile-view .profile-grid .grid-item img {
+            content-visibility: auto;
+            contain: content;
         }
         #profile-view .profile-grid .grid-item .grid-overlay {
             position: absolute;
@@ -1874,11 +1894,7 @@
                     <img src="https://i.ibb.co/C5nCx8sy/1785470208842.png" alt="icono" loading="lazy">
                     SnapPix
                 </div>
-                <button class="search-btn" id="search-btn" aria-label="Buscar">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                    </svg>
-                </button>
+                <!-- Ícono de lupa eliminado -->
             </div>
             <div class="feed-tabs-wrap">
                 <div class="feed-tabs" id="feed-tabs">
@@ -1886,7 +1902,13 @@
                     <button class="feed-tab-btn" data-feed-mode="for-you" id="feed-tab-foryou">Para ti</button>
                 </div>
             </div>
-            <div class="feed-container" id="feed-container"></div>
+            <div class="feed-container" id="feed-container">
+                <!-- Indicador de carga del feed -->
+                <div class="feed-loading" id="feed-loading">
+                    <div class="loader"></div>
+                    <p>Cargando publicaciones...</p>
+                </div>
+            </div>
         </div>
 
         <!-- ==================== PROFILE VIEW ==================== -->
@@ -1905,7 +1927,12 @@
                 </button>
             </div>
             <div class="profile-header" id="profile-header-content"></div>
-            <div class="profile-grid" id="profile-grid"></div>
+            <div class="profile-grid" id="profile-grid">
+                <!-- Spinner de carga de publicaciones se muestra aquí -->
+                <div class="profile-grid-loading" id="profile-posts-loading">
+                    <div class="spinner"></div>
+                </div>
+            </div>
         </div>
 
         <!-- ==================== CONFIRM MODAL ==================== -->
@@ -2249,8 +2276,14 @@
             pendingDelete: null,
             myFollowing: new Set(),
             userCache: {},
+            profileDataCache: {},
+            profileDataRequests: {},
             feedMode: 'recent',
             appDataLoadingFor: null,
+            loadingFeed: false,
+            // Caché de publicaciones por usuario para no recargar
+            userPostsCache: {},
+            userPostsRequests: {},
         };
 
         // ==================== REPRODUCTOR DE MÚSICA GLOBAL ====================
@@ -2453,6 +2486,7 @@
         const bottomNav = document.querySelector('.bottom-nav');
         const feedContainer = $('feed-container');
         const toast = $('toast');
+        const feedLoading = $('feed-loading');
 
         // ==================== UTILIDADES ====================
         function escapeHTML(str) {
@@ -2562,7 +2596,6 @@
             clearTimeout(loadingHideTimer);
             loadingHideTimer = setTimeout(() => {
                 if (loadingView) loadingView.style.display = 'none';
-                // Mostrar la alerta de donación después de ocultar el loading
                 showDonationAlert();
             }, 140);
         }
@@ -2714,134 +2747,245 @@
             }
         }
 
-        // Cargar perfil de usuario desde Firebase
+        // Cargar perfil de usuario desde Firebase con caché en memoria/localStorage
         async function loadUserProfile(uid) {
-            const snapshot = await db.ref('users/' + uid).once('value');
-            const data = snapshot.val();
-            if (data) {
+            if (!uid) return;
+
+            const profile = await getUserProfileData(uid, state.myProfile || {});
+            if (profile && profile.uid) {
                 state.myProfile.uid = uid;
-                state.myProfile.name = data.name || 'Usuario';
-                state.myProfile.username = data.username || 'usuario';
-                state.myProfile.bio = data.bio || '';
-                state.myProfile.avatar = data.avatar || '';
-                state.myProfile.followers = Object.keys(data.followers || {}).length;
-                state.myProfile.following = Object.keys(data.following || {}).length;
-                state.myProfile.totalLikes = 0;
+                state.myProfile.name = profile.name || 'Usuario';
+                state.myProfile.username = profile.username || 'usuario';
+                state.myProfile.bio = profile.bio || '';
+                state.myProfile.avatar = profile.avatar || '';
+                state.myProfile.followers = profile.followers || 0;
+                state.myProfile.following = profile.following || 0;
+                state.myProfile.totalLikes = state.myProfile.totalLikes || 0;
             } else {
                 showToast('No se encontró perfil');
             }
         }
 
-        // Obtener datos del usuario con caché para acelerar el render del feed
+        // Obtener datos del usuario con caché para que los perfiles abran inmediatamente.
+        // Primero usa memoria, luego localStorage y finalmente Firebase.
         async function getUserProfileData(uid, fallback = {}) {
             if (!uid) return fallback;
+
             const cached = state.userCache[uid];
-            if (cached) return cached;
+            if (cached) {
+                return cached && typeof cached.then === 'function' ? await cached : cached;
+            }
+
+            const now = Date.now();
+            try {
+                const localRaw = localStorage.getItem('snappix_profile_' + uid);
+                if (localRaw) {
+                    const local = JSON.parse(localRaw);
+                    if (local && local.data && (now - (local.time || 0)) < 10 * 60 * 1000) {
+                        const mergedLocal = {
+                            name: local.data.name || fallback.name || 'Anónimo',
+                            username: local.data.username || fallback.username || 'usuario',
+                            avatar: local.data.avatar || fallback.avatar || '',
+                            bio: local.data.bio || fallback.bio || '',
+                            followers: typeof local.data.followers === 'number' ? local.data.followers : (fallback.followers || 0),
+                            following: typeof local.data.following === 'number' ? local.data.following : (fallback.following || 0),
+                            uid: uid
+                        };
+                        state.userCache[uid] = mergedLocal;
+                        return mergedLocal;
+                    }
+                }
+            } catch (e) {}
+
+            if (state.profileDataRequests[uid]) {
+                return await state.profileDataRequests[uid];
+            }
+
+            // Un único request por usuario. Esto evita peticiones duplicadas simultáneas.
             const promise = db.ref('users/' + uid).once('value').then((snapshot) => {
                 const data = snapshot.val();
-                if (data) {
-                    return {
-                        name: data.name || fallback.name || 'Anónimo',
-                        username: data.username || fallback.username || 'usuario',
-                        avatar: data.avatar || fallback.avatar || '',
-                        bio: data.bio || fallback.bio || '',
-                        followers: Object.keys(data.followers || {}).length,
-                        following: Object.keys(data.following || {}).length,
-                    };
-                }
-                return fallback;
-            }).catch(() => fallback);
-            state.userCache[uid] = promise;
-            return promise;
+                const result = data ? {
+                    name: data.name || fallback.name || 'Anónimo',
+                    username: data.username || fallback.username || 'usuario',
+                    avatar: data.avatar || fallback.avatar || '',
+                    bio: data.bio || fallback.bio || '',
+                    followers: Object.keys(data.followers || {}).length,
+                    following: Object.keys(data.following || {}).length,
+                    uid: uid
+                } : {
+                    name: fallback.name || 'Anónimo',
+                    username: fallback.username || 'usuario',
+                    avatar: fallback.avatar || '',
+                    bio: fallback.bio || '',
+                    followers: fallback.followers || 0,
+                    following: fallback.following || 0,
+                    uid: uid
+                };
+
+                state.userCache[uid] = result;
+
+                try {
+                    localStorage.setItem('snappix_profile_' + uid, JSON.stringify({
+                        time: Date.now(),
+                        data: result
+                    }));
+                } catch (e) {}
+
+                return result;
+            }).catch(() => {
+                const result = {
+                    name: fallback.name || 'Anónimo',
+                    username: fallback.username || 'usuario',
+                    avatar: fallback.avatar || '',
+                    bio: fallback.bio || '',
+                    followers: fallback.followers || 0,
+                    following: fallback.following || 0,
+                    uid: uid
+                };
+                state.userCache[uid] = result;
+                return result;
+            });
+
+            state.profileDataRequests[uid] = promise;
+            try {
+                return await promise;
+            } finally {
+                delete state.profileDataRequests[uid];
+            }
         }
 
         // Cargar posts del feed desde Firebase (sin límite para que todos estén disponibles)
         async function loadFeed() {
+            state.loadingFeed = true;
+            feedLoading.classList.remove('hidden');
+
             await ensureMusicLibraryLoaded();
 
-            const snapshot = await db.ref('posts').orderByKey().once('value');
-            const postsData = snapshot.val();
-            const postsArray = [];
-            const authorUids = new Set();
+            try {
+                const snapshot = await db.ref('posts').orderByKey().once('value');
+                const postsData = snapshot.val();
+                const postsArray = [];
+                const authorUids = new Set();
 
-            if (postsData) {
-                for (const key in postsData) {
-                    const post = postsData[key];
-                    post.id = key;
-                    if (!post.images) post.images = [];
-                    if (post.comments && typeof post.comments === 'object' && !Array.isArray(post.comments)) {
-                        post.comments = Object.values(post.comments);
-                    } else if (!post.comments) {
-                        post.comments = [];
+                if (postsData) {
+                    for (const key in postsData) {
+                        const post = postsData[key];
+                        post.id = key;
+                        if (!post.images) post.images = [];
+                        if (post.comments && typeof post.comments === 'object' && !Array.isArray(post.comments)) {
+                            post.comments = Object.values(post.comments);
+                        } else if (!post.comments) {
+                            post.comments = [];
+                        }
+                        if (post.authorUid) authorUids.add(post.authorUid);
+                        postsArray.push(post);
                     }
-                    if (post.authorUid) authorUids.add(post.authorUid);
-                    postsArray.push(post);
                 }
-            }
 
-            await Promise.all([...authorUids].map(uid => getUserProfileData(uid)));
+                await Promise.all([...authorUids].map(uid => getUserProfileData(uid)));
 
-            await Promise.all(postsArray.map(async (post) => {
-                const fallbackUser = {
-                    name: post.authorName || 'Anónimo',
-                    username: post.authorUsername || 'usuario',
-                    avatar: post.authorAvatar || '',
-                    bio: '',
-                    followers: 0,
-                    following: 0,
-                };
-
-                if (post.authorUid) {
-                    const cachedUser = await getUserProfileData(post.authorUid, fallbackUser);
-                    post.user = {
-                        ...fallbackUser,
-                        ...cachedUser,
-                        username: cachedUser.username || fallbackUser.username,
-                        avatar: cachedUser.avatar || fallbackUser.avatar,
+                await Promise.all(postsArray.map(async (post) => {
+                    const fallbackUser = {
+                        name: post.authorName || 'Anónimo',
+                        username: post.authorUsername || 'usuario',
+                        avatar: post.authorAvatar || '',
+                        bio: '',
+                        followers: 0,
+                        following: 0,
                     };
-                } else {
-                    post.user = fallbackUser;
+
+                    if (post.authorUid) {
+                        const cachedUser = await getUserProfileData(post.authorUid, fallbackUser);
+                        post.user = {
+                            ...fallbackUser,
+                            ...cachedUser,
+                            username: cachedUser.username || fallbackUser.username,
+                            avatar: cachedUser.avatar || fallbackUser.avatar,
+                        };
+                    } else {
+                        post.user = fallbackUser;
+                    }
+
+                    const resolvedMusic = resolveMusicForPost(post);
+                    post.musicTitle = resolvedMusic.title;
+                    post.musicCover = resolvedMusic.icon;
+                    post.musicFile = resolvedMusic.file;
+                    post.musicTrack = post.musicTitle;
+                    post.likes = post.likes || 0;
+                    post.commentCount = post.comments ? post.comments.length : 0;
+                }));
+
+                postsArray.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+                state.posts = postsArray;
+                if (state.myProfile.uid) {
+                    const likedSnap = await db.ref('users/' + state.myProfile.uid + '/likedPosts').once('value');
+                    const liked = likedSnap.val();
+                    state.likedPosts = new Set(liked ? Object.keys(liked) : []);
                 }
-
-                const resolvedMusic = resolveMusicForPost(post);
-                post.musicTitle = resolvedMusic.title;
-                post.musicCover = resolvedMusic.icon;
-                post.musicFile = resolvedMusic.file;
-                post.musicTrack = post.musicTitle;
-                post.likes = post.likes || 0;
-                post.commentCount = post.comments ? post.comments.length : 0;
-            }));
-
-            postsArray.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-            state.posts = postsArray;
-            if (state.myProfile.uid) {
-                const likedSnap = await db.ref('users/' + state.myProfile.uid + '/likedPosts').once('value');
-                const liked = likedSnap.val();
-                state.likedPosts = new Set(liked ? Object.keys(liked) : []);
+                renderFeed();
+                setupIntersectionObserver();
+                setupVisiblePostObserver();
+            } catch (err) {
+                console.error('Error cargando feed:', err);
+                showToast('Error al cargar publicaciones');
+            } finally {
+                state.loadingFeed = false;
+                feedLoading.classList.add('hidden');
             }
-            renderFeed();
-            setupIntersectionObserver();
-            setupVisiblePostObserver();
         }
 
-        // Cargar publicaciones de un usuario específico
-        async function loadUserPosts(uid) {
-            const snapshot = await db.ref('posts').orderByChild('authorUid').equalTo(uid).once('value');
-            const data = snapshot.val();
-            const posts = [];
-            if (data) {
-                for (const key in data) {
-                    const p = data[key];
-                    p.id = key;
-                    posts.push(p);
-                }
+        // Cargar publicaciones de un usuario específico (con caché)
+        async function loadUserPosts(uid, force = false) {
+            if (!uid) return [];
+
+            if (!force && state.userPostsCache[uid]) {
+                state.userPosts = state.userPostsCache[uid];
+                return state.userPosts;
             }
-            state.userPosts = posts.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+            // El feed ya contiene las publicaciones; reutilizarlas evita una consulta adicional.
+            if (!force && Array.isArray(state.posts) && state.posts.length > 0) {
+                const localPosts = state.posts.filter(p => p && p.authorUid === uid);
+                localPosts.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+                state.userPostsCache[uid] = localPosts;
+                state.userPosts = localPosts;
+                return localPosts;
+            }
+
+            if (!force && state.userPostsRequests[uid]) {
+                const pending = await state.userPostsRequests[uid];
+                state.userPosts = pending;
+                return pending;
+            }
+
+            const promise = db.ref('posts').orderByChild('authorUid').equalTo(uid).once('value').then((snapshot) => {
+                const data = snapshot.val();
+                const posts = [];
+                if (data) {
+                    for (const key in data) {
+                        const p = data[key];
+                        p.id = key;
+                        posts.push(p);
+                    }
+                }
+                posts.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+                state.userPostsCache[uid] = posts;
+                state.userPosts = posts;
+                return posts;
+            });
+
+            state.userPostsRequests[uid] = promise;
+            try {
+                return await promise;
+            } finally {
+                delete state.userPostsRequests[uid];
+            }
         }
 
         // ==================== RENDERIZADO DEL FEED ====================
         function renderFeed() {
             const postsToRender = getFeedPostsForMode();
+            feedLoading.classList.add('hidden');
             feedContainer.innerHTML = '';
             postsToRender.forEach((post, index) => {
                 const postEl = createPostElement(post, index);
@@ -3129,68 +3273,45 @@
             }
         }
 
-        // ==================== PERFIL ====================
+        // ==================== PERFIL (CARGA ULTRARRÁPIDA) ====================
         async function openUserProfile(user, uid) {
             if (!uid) {
                 showToast('No se pudo cargar el perfil');
                 return;
             }
-            state.viewingProfile = { ...user, uid };
-            await renderProfileView(state.viewingProfile);
+
+            // Guardar inmediatamente el perfil que estamos viendo.
+            state.viewingProfile = { ...(user || {}), uid };
+
+            // Cambiar de pantalla antes de esperar a Firebase.
             switchToView('profile', false);
+
+            // Renderizar inmediatamente con los datos que ya tenemos del feed.
+            renderProfileView(state.viewingProfile);
         }
 
         function openMyProfile() {
             state.viewingProfile = null;
-            renderProfileView(null);
+
+            // Cambiar de pantalla inmediatamente.
             switchToView('profile', false);
+
+            // Render inicial inmediato con state.myProfile.
+            renderProfileView(null);
         }
 
-        async function renderProfileView(user) {
-            const isOwn = !user;
-            let profileData;
-            let uid = state.myProfile.uid;
-
-            if (isOwn) {
-                profileData = state.myProfile;
-            } else {
-                const snap = await db.ref('users/' + user.uid).once('value');
-                const data = snap.val();
-                if (!data) {
-                    showToast('Usuario no encontrado');
-                    return;
-                }
-                profileData = {
-                    name: data.name || 'Anónimo',
-                    username: data.username || 'usuario',
-                    bio: data.bio || '',
-                    avatar: data.avatar || '',
-                    followers: Object.keys(data.followers || {}).length,
-                    following: Object.keys(data.following || {}).length,
-                    uid: user.uid,
-                };
-            }
-
-            // Cargar posts del usuario
-            await loadUserPosts(profileData.uid || uid);
-            const postsToShow = state.userPosts;
-            let totalLikes = 0;
-            postsToShow.forEach(p => totalLikes += (p.likes || 0));
-            profileData.totalLikes = totalLikes;
-
-            const displayName = profileData.name;
+        // Función para renderizar la cabecera del perfil con los datos disponibles
+        function renderProfileHeader(profileData, isOwn, showBadge) {
+            const displayName = profileData.name || 'Anónimo';
             const displayBio = profileData.bio || '';
             const displayAvatar = profileData.avatar || '';
             const displayFollowers = profileData.followers || 0;
             const displayFollowing = profileData.following || 0;
-            const showBadge = userHasVerifiedBadge(profileData.uid || uid, totalLikes);
-
-            document.getElementById('profile-title-display').textContent = 'Perfil';
 
             const headerContent = document.getElementById('profile-header-content');
             headerContent.innerHTML = `
                     <div class="profile-avatar">
-                        ${displayAvatar ? `<img src="${displayAvatar}" alt="" onerror="this.style.display='none';this.parentElement.innerHTML='<div class=avatar-placeholder>${displayName.charAt(0)}</div>'">` : `<div class="avatar-placeholder">${displayName.charAt(0)}</div>`}
+                        ${displayAvatar ? `<img src="${displayAvatar}" alt="" loading="eager" decoding="async" fetchpriority="high" onerror="this.style.display='none';this.parentElement.innerHTML='<div class=avatar-placeholder>${escapeHTML(displayName.charAt(0))}</div>'">` : `<div class="avatar-placeholder">${escapeHTML(displayName.charAt(0))}</div>`}
                     </div>
                     <div class="profile-name">
                         ${escapeHTML(displayName)}
@@ -3198,9 +3319,9 @@
                     </div>
                     <div class="profile-bio">${escapeHTML(displayBio)}</div>
                     <div class="profile-stats">
-                        <div class="stat"><strong>${formatNumber(displayFollowers)}</strong> seguidores</div>
-                        <div class="stat"><strong>${formatNumber(displayFollowing)}</strong> siguiendo</div>
-                        <div class="stat"><strong id="profile-total-likes">${formatNumber(totalLikes)}</strong> me gusta</div>
+                        <div class="stat"><strong id="profile-followers-count">${formatNumber(displayFollowers)}</strong> seguidores</div>
+                        <div class="stat"><strong id="profile-following-count">${formatNumber(displayFollowing)}</strong> siguiendo</div>
+                        <div class="stat"><strong id="profile-total-likes">${formatNumber(profileData.totalLikes || 0)}</strong> me gusta</div>
                     </div>
                     <div class="profile-actions">
                         ${isOwn ? `
@@ -3213,25 +3334,34 @@
                 `;
 
             if (isOwn) {
-                document.getElementById('edit-profile-btn').addEventListener('click', openEditProfileModal);
-                document.getElementById('logout-btn').addEventListener('click', () => {
-                    if (confirm('¿Cerrar sesión?')) {
-                        audioPlayer.pause();
-                        audioPlayer.src = '';
-                        state.isMusicPlaying = false;
-                        state.currentMusicPostId = null;
-                        auth.signOut();
-                        showToast('Sesión cerrada');
-                        state.posts = [];
-                        state.userPosts = [];
-                        state.likedPosts = new Set();
-                        state.myProfile = { uid: '', name: '', username: '', bio: '', avatar: '', followers: 0,
-                            following: 0, totalLikes: 0 };
-                        state.userCache = {};
-                        feedContainer.innerHTML = '';
-                        showAuth();
-                    }
-                });
+                const editBtn = document.getElementById('edit-profile-btn');
+                const logoutBtn = document.getElementById('logout-btn');
+
+                if (editBtn) editBtn.addEventListener('click', openEditProfileModal);
+                if (logoutBtn) {
+                    logoutBtn.addEventListener('click', () => {
+                        if (confirm('¿Cerrar sesión?')) {
+                            audioPlayer.pause();
+                            audioPlayer.src = '';
+                            state.isMusicPlaying = false;
+                            state.currentMusicPostId = null;
+                            auth.signOut();
+                            showToast('Sesión cerrada');
+                            state.posts = [];
+                            state.userPosts = [];
+                            state.likedPosts = new Set();
+                            state.myProfile = { uid: '', name: '', username: '', bio: '', avatar: '', followers: 0,
+                                following: 0, totalLikes: 0 };
+                            state.userCache = {};
+                            state.profileDataCache = {};
+                            state.profileDataRequests = {};
+                            state.userPostsCache = {};
+                            state.userPostsRequests = {};
+                            feedContainer.innerHTML = '';
+                            showAuth();
+                        }
+                    });
+                }
             } else {
                 const followBtn = document.querySelector('.follow-btn');
                 if (followBtn) {
@@ -3251,22 +3381,128 @@
                                 state.myFollowing.add(targetUid);
                                 showToast('Ahora sigues a ' + displayName);
                             }
-                            // Actualizar perfil
-                            await renderProfileView(user);
+
+                            // Actualizar cachés localmente y evitar una nueva consulta completa.
+                            const cached = state.userCache[targetUid];
+                            if (cached && typeof cached !== 'function') {
+                                cached.followers = Math.max(0, (cached.followers || 0) + (isFollowingNow ? -1 : 1));
+                            }
+
+                            try {
+                                const localRaw = localStorage.getItem('snappix_profile_' + targetUid);
+                                if (localRaw) {
+                                    const local = JSON.parse(localRaw);
+                                    if (local && local.data) {
+                                        local.data.followers = Math.max(0, (local.data.followers || 0) + (isFollowingNow ? -1 : 1));
+                                        local.time = Date.now();
+                                        localStorage.setItem('snappix_profile_' + targetUid, JSON.stringify(local));
+                                    }
+                                }
+                            } catch (e) {}
+
+                            renderProfileView(state.viewingProfile);
                         } catch (err) {
                             showToast('Error: ' + err.message);
                         }
                     });
                 }
             }
+        }
+
+        async function renderProfileView(user) {
+            const isOwn = !user;
+            const uid = isOwn ? state.myProfile.uid : user.uid;
+            if (!uid) return;
 
             const grid = document.getElementById('profile-grid');
 
-            if (postsToShow.length === 0) {
+            // No borra el contenido anterior si ya pertenece al mismo usuario.
+            // Así el perfil se ve instantáneamente al volver a abrirlo.
+            if (grid.dataset.profileUid !== uid) {
+                grid.dataset.profileUid = uid;
+                grid.innerHTML = `
+                    <div class="profile-grid-loading" id="profile-posts-loading">
+                        <div class="spinner"></div>
+                    </div>
+                `;
+            }
+
+            // Datos iniciales disponibles inmediatamente.
+            let profileData;
+            if (isOwn) {
+                profileData = {
+                    ...state.myProfile
+                };
+            } else {
+                profileData = {
+                    name: user.name || 'Anónimo',
+                    username: user.username || 'usuario',
+                    bio: user.bio || '',
+                    avatar: user.avatar || '',
+                    followers: user.followers || 0,
+                    following: user.following || 0,
+                    uid: uid,
+                    totalLikes: 0
+                };
+
+                // Si ya existe en caché, usarlo inmediatamente.
+                const cachedUser = state.userCache[uid];
+                if (cachedUser && typeof cachedUser !== 'function') {
+                    profileData = { ...profileData, ...cachedUser };
+                }
+            }
+
+            // Mostrar encabezado sin esperar Firebase.
+            let quickLikes = 0;
+            if (Array.isArray(state.posts)) {
+                state.posts.forEach(p => {
+                    if (p.authorUid === uid) quickLikes += (p.likes || 0);
+                });
+            }
+            profileData.totalLikes = quickLikes;
+            renderProfileHeader(profileData, isOwn, userHasVerifiedBadge(uid, quickLikes));
+
+            // Cargar perfil + publicaciones en paralelo.
+            const profilePromise = isOwn
+                ? Promise.resolve(profileData)
+                : getUserProfileData(uid, profileData);
+
+            const postsPromise = loadUserPosts(uid);
+
+            const results = await Promise.all([profilePromise, postsPromise]);
+            const freshProfile = results[0] || profileData;
+            const posts = results[1] || [];
+
+            // Calcular likes con los posts reales.
+            let totalLikes = 0;
+            posts.forEach(p => totalLikes += (p.likes || 0));
+
+            const finalProfile = {
+                ...profileData,
+                ...freshProfile,
+                uid: uid,
+                totalLikes: totalLikes
+            };
+
+            // No reemplazar la cabecera si el usuario ya cambió de perfil.
+            if (state.viewingProfile && state.viewingProfile.uid !== uid) return;
+            if (!state.viewingProfile && !isOwn) return;
+
+            renderProfileHeader(finalProfile, isOwn, userHasVerifiedBadge(uid, totalLikes));
+            renderProfileGrid(isOwn, finalProfile, posts);
+        }
+
+        function renderProfileGrid(isOwn, profileData, posts) {
+            const grid = document.getElementById('profile-grid');
+            // Ocultar el spinner de carga
+            const loadingEl = document.getElementById('profile-posts-loading');
+            if (loadingEl) loadingEl.remove();
+
+            if (posts.length === 0) {
                 grid.innerHTML =
                     '<div class="profile-empty"><p style="font-size:3rem;">📷</p><p>No hay publicaciones aún.</p></div>';
             } else {
-                grid.innerHTML = postsToShow.map(post => {
+                grid.innerHTML = posts.map(post => {
                     const cover = post.images && post.images.length > 0 ? post.images[0] : (post.url || '');
                     const isOwnPost = isOwn || (post.authorUid === state.myProfile.uid);
                     return `
@@ -3287,13 +3523,11 @@
                         if (e.target.closest('.delete-btn')) return;
                         const postId = item.dataset.postId;
                         switchToView('feed', false);
-                        // Asegurar que el post está en el feed (ya está cargado)
                         setTimeout(() => {
                             const postEl = document.querySelector(`.post[data-post-id="${postId}"]`);
                             if (postEl) {
                                 postEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
                             } else {
-                                // Si no está, recargamos el feed y buscamos de nuevo
                                 loadFeed().then(() => {
                                     const newPostEl = document.querySelector(`.post[data-post-id="${postId}"]`);
                                     if (newPostEl) {
@@ -3307,7 +3541,7 @@
                     });
                 });
 
-                // Eventos: eliminar publicación (con modal personalizado)
+                // Eventos: eliminar publicación
                 grid.querySelectorAll('.delete-btn').forEach(btn => {
                     btn.addEventListener('click', (e) => {
                         e.stopPropagation();
@@ -3338,6 +3572,12 @@
                 try {
                     await db.ref('posts/' + postId).remove();
                     state.posts = state.posts.filter(p => p.id !== postId);
+                    // Limpiar caché de publicaciones del usuario
+                    const uid = state.viewingProfile?.uid || state.myProfile.uid;
+                    if (uid) {
+                        state.userPostsCache[uid] = null;
+                        delete state.userPostsRequests[uid];
+                    }
                     state.userPosts = state.userPosts.filter(p => p.id !== postId);
                     const currentUser = state.viewingProfile || null;
                     await renderProfileView(currentUser);
@@ -3404,6 +3644,24 @@
                 state.myProfile.name = name || state.myProfile.name;
                 state.myProfile.bio = bio || '';
                 state.myProfile.avatar = avatarUrl;
+
+                // Actualizar cachés del perfil para que la próxima apertura sea inmediata.
+                state.userCache[state.myProfile.uid] = {
+                    name: state.myProfile.name,
+                    username: state.myProfile.username || 'usuario',
+                    bio: state.myProfile.bio,
+                    avatar: state.myProfile.avatar,
+                    followers: state.myProfile.followers || 0,
+                    following: state.myProfile.following || 0,
+                    uid: state.myProfile.uid
+                };
+                try {
+                    localStorage.setItem('snappix_profile_' + state.myProfile.uid, JSON.stringify({
+                        time: Date.now(),
+                        data: state.userCache[state.myProfile.uid]
+                    }));
+                } catch (e) {}
+
                 closeEditProfileModal();
                 renderProfileView(null);
                 showToast('✅ Perfil actualizado');
@@ -3662,6 +3920,9 @@
                 await ref.set(newPost);
                 newPost.id = ref.key;
                 state.posts.unshift(newPost);
+                // Invalidar caché de publicaciones del usuario
+                state.userPostsCache[state.myProfile.uid] = null;
+                    delete state.userPostsRequests[state.myProfile.uid];
                 if (newPost.authorUid === state.myProfile.uid) {
                     state.userPosts.unshift(newPost);
                 }
@@ -3715,11 +3976,6 @@
             document.getElementById('nav-upload').addEventListener('click', openUploadModal);
 
             document.getElementById('profile-back-btn').addEventListener('click', () => switchToView('feed'));
-
-            // Lupa (solo decorativa)
-            document.getElementById('search-btn').addEventListener('click', () => {
-                showToast('🔍 Búsqueda desactivada');
-            });
 
             // Upload
             document.getElementById('upload-close-btn').addEventListener('click', closeUploadModal);
@@ -3825,7 +4081,6 @@
                 if (user) {
                     state.currentUser = user;
                     await loadUserProfile(user.uid);
-                    // Cargar following
                     const followSnap = await db.ref('users/' + user.uid + '/following').once('value');
                     const followData = followSnap.val();
                     state.myFollowing = new Set(followData ? Object.keys(followData) : []);
